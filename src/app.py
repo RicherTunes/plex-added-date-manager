@@ -16,6 +16,8 @@ st.markdown(
     .meta { color:#6b7280; font-size:0.9rem; margin:4px 0 0; }
     .title-row h3 { margin-bottom: 2px; }
     .subtle { color:#6b7280; }
+    .chip { display:inline-block; background:#eef2ff; color:#3730a3; padding:2px 8px; border-radius:12px; font-size:0.75rem; margin-right:6px; }
+    .block-container { padding-top: .5rem; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -269,6 +271,53 @@ def _render_items(
     total_selected = sum(1 for v in selected.values() if v)
     st.caption(f"Selected: {total_selected}")
 
+    # Date range selection (advanced)
+    with st.expander("Select by Added date range", expanded=False):
+        rc1, rc2 = st.columns(2)
+        with rc1:
+            range_from = st.date_input("From", key=f"{key_prefix}_range_from", value=datetime.date.today() - datetime.timedelta(days=365))
+        with rc2:
+            range_to = st.date_input("To", key=f"{key_prefix}_range_to", value=datetime.date.today())
+        act1, act2 = st.columns(2)
+        def _select_range(select: bool):
+            start_ts = int(datetime.datetime.combine(range_from, datetime.time.min).timestamp())
+            end_ts = int(datetime.datetime.combine(range_to, datetime.time.max).timestamp())
+            progress = st.progress(0)
+            touched = 0
+            try:
+                start = 0
+                while True:
+                    batch_items, total = plex.fetch_items(
+                        section_id,
+                        type_id,
+                        start=start,
+                        size=page_size,
+                        sort=sort,
+                        filters=({"year": year} if year else None),
+                    )
+                    if title_filter:
+                        batch_items = [i for i in batch_items if title_filter in (i.get("title", "").lower())]
+                    for it in batch_items:
+                        at = int(it.get("addedAt", 0) or 0)
+                        if start_ts <= at <= end_ts:
+                            rk = str(it.get("ratingKey"))
+                            if rk:
+                                selected[rk] = select
+                                touched += 1
+                    start += page_size
+                    if start >= total:
+                        break
+                    progress.progress(min(100, int(start * 100 / max(1, total))))
+            finally:
+                progress.progress(100)
+            st.success(("Selected" if select else "Deselected") + f" {touched} items in range.")
+        with act1:
+            if st.button("Select range", key=f"{key_prefix}_select_range"):
+                _select_range(True)
+        with act2:
+            if st.button("Deselect range", key=f"{key_prefix}_deselect_range"):
+                _select_range(False)
+
     # Render list
     for item in items:
         rating_key = str(item.get("ratingKey"))
@@ -312,9 +361,8 @@ def _render_items(
                 date_kwargs["value"] = added_dt.date()
             st.date_input("Added", key=date_key, on_change=_on_change_inline, **date_kwargs)
 
-            # Secondary info
-            st.caption(f"Release: {rel}")
-            st.caption(f"ID: {rating_key}")
+            # Secondary info chips
+            st.markdown(f"<span class='chip'>Release {rel}</span> <span class='chip'>ID {rating_key}</span>", unsafe_allow_html=True)
 
 
 def main() -> None:
@@ -436,4 +484,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
