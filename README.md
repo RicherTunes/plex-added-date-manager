@@ -45,6 +45,9 @@ python src/cli.py --section-id 1 --type movie --year 2023 --date 2024-01-15 --dr
 # Apply with lock and throttle 0.1s per item
 python src/cli.py --section-id 1 --type movie --year 2023 --date 2024-01-15 --sleep 0.1
 
+# Rate limit to at most 120 updates/minute (auto sleep)
+python src/cli.py --section-id 1 --type movie --year 2023 --date 2024-01-15 --max-per-minute 120
+
 # Only items whose title contains "Batman" (client-side filter)
 python src/cli.py --section-id 1 --type movie --title-contains batman --date 2022-10-01
 
@@ -66,6 +69,7 @@ Flags:
 - `--page-size`: Fetch page size (default 200).
 - `--max-items`: Stop after N updates.
 - `--sleep`: Seconds between updates.
+- `--max-per-minute`: Ceiling on updates per minute; auto-calculates sleep.
 - `--no-lock`: Do not lock the `addedAt` field after update.
 - `--dry-run`: Show planned changes only.
 - `--base-url`, `--token`: Override `.env`.
@@ -76,6 +80,8 @@ Flags:
 - Server-side sorting and year filter: Sort by added date, title, or year; filter by year.
 - Title contains: Client-side filter on the current page to quickly narrow items.
 - Batch updates: Select multiple items (persist selections across pages), pick a date, and update all at once with progress feedback and optional metadata lock.
+- Section discovery: Section selector is auto-populated from your Plex server (Movies vs Shows).
+- Select all results: With current filters applied, select items across all pages; also includes "Clear all".
 - QoL toggles: Show/hide images and enable/disable per-item edit controls to keep the UI light.
 
 Notes:
