@@ -86,7 +86,7 @@ class PlexAPI:
         }
         if lock:
             params["addedAt.locked"] = "1"
-        response = requests.put(url, params=params, headers={"Accept": "application/json"}, timeout=30)
+        response = requests.put(url, params=params, headers=self._get_headers(), timeout=30)
         response.raise_for_status()
         return True
 
