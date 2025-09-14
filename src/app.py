@@ -7,6 +7,16 @@ import streamlit as st
 from plex_api import PlexAPI
 
 st.set_page_config(page_title="Plex Added Date Manager", layout="wide")
+# Lightweight styling for metadata
+st.markdown(
+    """
+    <style>
+    .meta { color:#6b7280; font-size:0.85rem; margin:4px 0 10px; }
+    .title-row h3 { margin-bottom: 2px; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 
 @st.cache_data(show_spinner=False, ttl=30)
@@ -152,7 +162,7 @@ def _render_items(
     left, mid, right = st.columns([2, 3, 2])
     with left:
         page_select_all = st.checkbox("Select all on page", key=f"{key_prefix}_select_all")
-        b1, b2 = st.columns(2)
+        b1, b2, b3 = st.columns(3)
         with b1:
             if st.button("Select all results", key=f"{key_prefix}_select_all_results"):
                 # Enumerate across all pages with current filters
@@ -189,6 +199,13 @@ def _render_items(
             if st.button("Clear all", key=f"{key_prefix}_clear_all"):
                 selected.clear()
                 st.success("Cleared all selections.")
+        with b3:
+            if st.button("Clear page", key=f"{key_prefix}_clear_page"):
+                for it in items:
+                    rk = str(it.get("ratingKey"))
+                    if rk in selected:
+                        selected[rk] = False
+                st.success("Cleared selections on this page.")
     with mid:
         batch_date = st.date_input("Batch date", value=datetime.date.today(), key=f"{key_prefix}_batch_date")
         max_per_min = st.number_input("Max/min (0=unlimited)", min_value=0, value=0, step=30, key=f"{key_prefix}_max_per_min")
@@ -226,6 +243,10 @@ def _render_items(
                             time.sleep(per_item_sleep)
                 st.success(f"Updated {successes}/{total} items.")
 
+    # Selection summary
+    total_selected = sum(1 for v in selected.values() if v)
+    st.caption(f"Selected: {total_selected}")
+
     # Render list
     for item in items:
         rating_key = str(item.get("ratingKey"))
@@ -246,17 +267,23 @@ def _render_items(
             display = f"{title} ({year})" if year else title
             if rel:
                 st.markdown(
-                    f"<h3 title='Release Date: {rel}' style='margin-bottom:0'>{display}</h3>",
+                    f"<div class='title-row'><h3 title='Release Date: {rel}'>{display}</h3></div>",
                     unsafe_allow_html=True,
                 )
             else:
-                st.markdown(f"<h3 style='margin-bottom:0'>{display}</h3>", unsafe_allow_html=True)
+                st.markdown(f"<div class='title-row'><h3>{display}</h3></div>", unsafe_allow_html=True)
 
             added_at = item.get("addedAt")
             if added_at:
                 added_dt = datetime.datetime.fromtimestamp(int(added_at))
             else:
                 added_dt = datetime.datetime.now()
+            added_label = added_dt.strftime("%Y-%m-%d")
+            rel_label = rel or "—"
+            st.markdown(
+                f"<div class='meta'>Added: <strong>{added_label}</strong> • Release: {rel_label} • ID: {rating_key}</div>",
+                unsafe_allow_html=True,
+            )
 
             if show_item_edit:
                 new_date = st.date_input(
@@ -409,3 +436,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
