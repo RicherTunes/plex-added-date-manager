@@ -1,13 +1,15 @@
 
 def _inject_fixed_pager(prefix: str, tab_label: str, page: int, total_pages: int) -> None:
-    returnimport datetime
+    return
+import datetime
 import time
 from typing import Dict, List, Tuple
 
 import streamlit as st
 
 from plex_api import PlexAPI
-from streamlit import components`nfrom string import Template
+from streamlit import components
+from string import Template
 
 
 st.set_page_config(page_title="Plex Added Date Manager", layout="wide")
@@ -604,6 +606,9 @@ def _inject_sticky_filters(tab_label: str, top_offset_px: int = 48) -> None:
 
 if __name__ == "__main__":
     main()
+
+
+
 
 
 
