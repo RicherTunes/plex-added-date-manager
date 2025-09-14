@@ -553,6 +553,7 @@ def main() -> None:
     # Movies
     with tab1:
         cfg = _controls("movie", sections=sections, required_type="1")
+        _inject_sticky_filters("Movies", top_offset_px=48)
         section_id = cfg["section_id"] or "1"
         type_id = "1"
 
@@ -605,6 +606,7 @@ def main() -> None:
     # Shows
     with tab2:
         cfg = _controls("show", sections=sections, required_type="2")
+        _inject_sticky_filters("TV Series", top_offset_px=48)
         section_id = cfg["section_id"] or "2"
         type_id = "2"
 
@@ -652,6 +654,57 @@ def main() -> None:
             st.info("No shows found for current filters.")
 
         _nav("show", "bottom", cfg, total_pages, total, "show_page")
+
+
+def _inject_sticky_filters(tab_label: str, top_offset_px: int = 48) -> None:
+    """Make the first filter toolbar in the active tab sticky below the mini-pager."""
+    html = f"""
+    <script>
+      (function(){{
+        const tabLabel = {tab_label!r};
+        function activeTab(){{
+          const t = parent.document.querySelector('button[role="tab"][aria-selected="true"]');
+          return t ? t.innerText.trim() : '';
+        }}
+        function getActivePanel(){{
+          const tabs = parent.document.querySelectorAll('button[role="tab"]');
+          let idx = -1;
+          tabs.forEach((t,i)=>{{ if(t.getAttribute('aria-selected')==='true') idx=i; }});
+          const panels = parent.document.querySelectorAll('div[role="tabpanel"]');
+          return (idx>=0 && panels[idx])? panels[idx] : null;
+        }}
+        function makeSticky(){{
+          if(activeTab()!==tabLabel) return;
+          const panel = getActivePanel();
+          if(!panel) return;
+          const btns = panel.querySelectorAll('button');
+          let resetBtn = null;
+          btns.forEach(b=>{{ if((b.innerText||'').trim()==='Reset Filters') resetBtn=b; }});
+          if(!resetBtn) return;
+          let node = resetBtn.parentElement;
+          for(let i=0; i<8 && node; i++){{
+            if(node.getAttribute && (node.getAttribute('data-testid')==='stHorizontalBlock' || node.getAttribute('data-testid')==='stVerticalBlock')) break;
+            node = node.parentElement;
+          }}
+          if(!node) return;
+          node.style.position = 'sticky';
+          node.style.top = '{top_offset_px}px';
+          node.style.zIndex = '900';
+          node.style.background = 'rgba(255,255,255,0.96)';
+          node.style.backdropFilter = 'blur(2px)';
+          node.style.borderBottom = '1px solid #e5e7eb';
+          node.style.paddingTop = '6px';
+          node.style.paddingBottom = '6px';
+        }}
+        setTimeout(makeSticky, 50);
+        setInterval(makeSticky, 500);
+      }})();
+    </script>
+    """
+    try:
+        components.v1.html(html, height=0)  # type: ignore[attr-defined]
+    except Exception:
+        pass
 
 
 if __name__ == "__main__":
