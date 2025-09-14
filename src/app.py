@@ -1,11 +1,27 @@
 import datetime
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 import streamlit as st
 
 from plex_api import PlexAPI
 
 st.set_page_config(page_title="Plex Added Date Manager", layout="wide")
+
+
+@st.cache_data(show_spinner=False, ttl=30)
+def _cached_fetch(
+    base_url: str,
+    token: str,
+    section_id: str,
+    type_id: str,
+    start: int,
+    size: int,
+    sort: str,
+    year: str,
+) -> Tuple[List[dict], int]:
+    p = PlexAPI(base_url=base_url, token=token)
+    filters = {"year": year} if year else None
+    return p.fetch_items(section_id, type_id, start=start, size=size, sort=sort, filters=filters)
 
 
 def _init_state():
@@ -77,7 +93,7 @@ def _controls(prefix: str) -> Dict:
     with c8:
         st.checkbox("Lock added date", key=lock_key, value=st.session_state[lock_key])
     with c9:
-        if st.button("Reset Filters"):
+        if st.button("Reset Filters", key=f"{prefix}_reset"):
             st.session_state[year_key] = ""
             st.session_state[title_key] = ""
             st.session_state[sort_key] = "addedAt:desc"
@@ -102,6 +118,7 @@ def _render_items(
     *,
     type_id: str,
     select_key: str,
+    key_prefix: str,
     show_images: bool,
     show_item_edit: bool,
     lock_added: bool,
@@ -112,11 +129,11 @@ def _render_items(
     # Batch controls
     left, mid, right = st.columns([2, 3, 2])
     with left:
-        page_select_all = st.checkbox("Select all on page")
+        page_select_all = st.checkbox("Select all on page", key=f"{key_prefix}_select_all")
     with mid:
-        batch_date = st.date_input("Batch date", value=datetime.date.today())
+        batch_date = st.date_input("Batch date", value=datetime.date.today(), key=f"{key_prefix}_batch_date")
     with right:
-        if st.button("Apply to selected"):
+        if st.button("Apply to selected", key=f"{key_prefix}_apply_batch"):
             keys = [k for k, v in selected.items() if v]
             if not keys:
                 st.warning("No items selected.")
@@ -141,7 +158,7 @@ def _render_items(
         cols = st.columns([0.2, 0.8])
         with cols[0]:
             checked = page_select_all or selected.get(rating_key, False)
-            sel = st.checkbox("Select", key=f"sel_{rating_key}", value=checked)
+            sel = st.checkbox("Select", key=f"{key_prefix}_sel_{rating_key}", value=checked)
             selected[rating_key] = sel
             if show_images:
                 thumb = item.get("thumb")
@@ -171,10 +188,10 @@ def _render_items(
                 new_date = st.date_input(
                     "Edit Added Date",
                     value=added_dt.date(),
-                    key=f"date_{rating_key}",
+                    key=f"{key_prefix}_date_{rating_key}",
                 )
                 new_unix = int(datetime.datetime.combine(new_date, datetime.time.min).timestamp())
-                if st.button("Update Date", key=f"update_{rating_key}"):
+                if st.button("Update Date", key=f"{key_prefix}_update_{rating_key}"):
                     plex.update_added_date(section_id, rating_key, type_id, new_unix, lock=lock_added)
                     st.success(f"Updated added date for {title} to {new_date}")
 
@@ -196,18 +213,16 @@ def main():
         section_id = cfg["section_id"] or "1"
         type_id = "1"
 
-        filters = {}
-        if cfg["year"]:
-            filters["year"] = cfg["year"]
-
         start = (cfg["page"] - 1) * int(cfg["page_size"])
-        items, total = plex.fetch_items(
+        items, total = _cached_fetch(
+            plex.base_url,
+            plex.token,
             section_id,
             type_id,
-            start=start,
-            size=int(cfg["page_size"]),
-            sort=cfg["sort"],
-            filters=filters,
+            start,
+            int(cfg["page_size"]),
+            cfg["sort"],
+            cfg["year"] or "",
         )
 
         # Optional client-side title filter (applies to current page only)
@@ -219,13 +234,13 @@ def main():
 
         nav_l, nav_c, nav_r = st.columns([1, 2, 1])
         with nav_l:
-            if st.button("◀ Prev", disabled=cfg["page"] <= 1):
+            if st.button("◀ Prev", key="movie_prev", disabled=cfg["page"] <= 1):
                 st.session_state["movie_page"] = max(1, cfg["page"] - 1)
                 st.experimental_rerun()
         with nav_c:
             st.write(f"Page {cfg['page']} of {total_pages} • Total {total}")
         with nav_r:
-            if st.button("Next ▶", disabled=cfg["page"] >= total_pages):
+            if st.button("Next ▶", key="movie_next", disabled=cfg["page"] >= total_pages):
                 st.session_state["movie_page"] = min(total_pages, cfg["page"] + 1)
                 st.experimental_rerun()
 
@@ -235,6 +250,7 @@ def main():
                 items,
                 type_id=type_id,
                 select_key="movie_selected",
+                key_prefix="movie",
                 show_images=cfg["show_images"],
                 show_item_edit=cfg["show_item_edit"],
                 lock_added=cfg["lock"],
@@ -249,18 +265,16 @@ def main():
         section_id = cfg["section_id"] or "2"
         type_id = "2"  # show
 
-        filters = {}
-        if cfg["year"]:
-            filters["year"] = cfg["year"]
-
         start = (cfg["page"] - 1) * int(cfg["page_size"])
-        items, total = plex.fetch_items(
+        items, total = _cached_fetch(
+            plex.base_url,
+            plex.token,
             section_id,
             type_id,
-            start=start,
-            size=int(cfg["page_size"]),
-            sort=cfg["sort"],
-            filters=filters,
+            start,
+            int(cfg["page_size"]),
+            cfg["sort"],
+            cfg["year"] or "",
         )
 
         title_filter = (cfg["title"] or "").strip().lower()
@@ -287,6 +301,7 @@ def main():
                 items,
                 type_id=type_id,
                 select_key="show_selected",
+                key_prefix="show",
                 show_images=cfg["show_images"],
                 show_item_edit=cfg["show_item_edit"],
                 lock_added=cfg["lock"],
@@ -298,3 +313,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
