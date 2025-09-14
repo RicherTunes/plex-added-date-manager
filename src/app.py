@@ -7,7 +7,7 @@ from typing import Dict, List, Tuple
 import streamlit as st
 
 from plex_api import PlexAPI
-from streamlit import components
+from streamlit import components`nfrom string import Template
 
 
 st.set_page_config(page_title="Plex Added Date Manager", layout="wide")
@@ -21,7 +21,7 @@ st.markdown(
     .subtle { color:#6b7280; }
     .chip { display:inline-block; background:#eef2ff; color:#3730a3; padding:2px 8px; border-radius:12px; font-size:0.75rem; margin-right:6px; }
     /* Leave room for fixed mini-pager at top */
-    .block-container { padding-top: .25rem; }
+    .block-container { padding-top: 3.0rem; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -604,6 +604,8 @@ def _inject_sticky_filters(tab_label: str, top_offset_px: int = 48) -> None:
 
 if __name__ == "__main__":
     main()
+
+
 
 
 
