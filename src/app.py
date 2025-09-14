@@ -13,6 +13,10 @@ from typing import Dict, List, Tuple
 import streamlit as st
 
 from plex_api import PlexAPI
+import ui_nav as nav
+import ui_controls as controls
+from data_cache import _cached_fetch as cached_fetch
+from ui_render import _render_items as render_items
 from streamlit import components
 from string import Template
 
@@ -89,7 +93,7 @@ def _qp_set(params: Dict[str, str]) -> None:
             st.query_params[k] = v
     except Exception:
         try:
-            st.experimental_set_query_params(**params)  # type: ignore[attr-defined]
+            st.experimental_set_query_params(params)  # type: ignore[attr-defined]
         except Exception:
             pass
 
@@ -421,7 +425,7 @@ def _render_items(
                         except Exception as e:  # noqa: BLE001
                             attempts += 1
                             last_err = e
-                            time.sleep(min(8, 0.5 * (2 ** (attempts - 1))))
+                            time.sleep(min(8, 0.5 * (2  (attempts - 1))))
                     if last_err is not None:
                         st.error(f"Failed updating id={rating_key}: {last_err}")
                     progress.progress(int(idx * 100 / total_sel))
@@ -546,9 +550,16 @@ def _render_items(
                     st.error(f"Failed to save {title}: {e}")
 
             date_kwargs = {}
-            if date_key not in st.session_state:
-                date_kwargs["value"] = added_dt.date()
-            st.date_input("Added", key=date_key, on_change=_on_change_inline, **date_kwargs)
+            label_vis = "collapsed" if density == "Ultra Compact" else "visible"
+            try:
+                st.date_input("Added", key=date_key, on_change=_on_change_inline, label_visibility=label_vis, **date_kwargs)
+            except TypeError:
+                if density == "Ultra Compact":
+                    st.date_input("", key=date_key, on_change=_on_change_inline, date_kwargs)
+                else:
+                    st.date_input("Added", key=date_key, on_change=_on_change_inline, date_kwargs)
+                else:
+                    st.date_input("Added", key=date_key, on_change=_on_change_inline, date_kwargs)
 
             # Secondary info chips
             st.markdown(f"<span class='chip'>Release {rel}</span> <span class='chip'>ID {rating_key}</span>", unsafe_allow_html=True)
@@ -561,8 +572,8 @@ def main() -> None:
         st.markdown("<h3 style='margin-bottom:0.25rem'>Plex Added Date Manager</h3>", unsafe_allow_html=True)
     with hdr_r:
         st.selectbox("Density", ["Comfortable", "Compact", "Ultra Compact"], key="ui_density")
-    _apply_density()
-    _init_state()
+    controls._apply_density()
+    controls._init_state()
 
     plex = PlexAPI()
     if not plex.base_url or not plex.token:
@@ -579,14 +590,14 @@ def main() -> None:
 
     # Movies
     with tab1:
-        cfg = _controls("movie", sections=sections, required_type="1")
-        _inject_sticky_filters("Movies", top_offset_px=48)
+        cfg = controls._controls("movie", sections=sections, required_type="1")
+        nav._inject_sticky_filters("Movies", top_offset_px=48)
         section_id = cfg["section_id"] or "1"
         type_id = "1"
 
         start = (int(cfg["page"]) - 1) * int(cfg["page_size"])
         try:
-            items, total = _cached_fetch(
+            items, total = cached_fetch(
                 plex.base_url,
                 plex.token,
                 section_id,
@@ -606,12 +617,12 @@ def main() -> None:
             items = [i for i in items if title_filter in (i.get("title", "").lower())]
 
         total_pages = max(1, (total + int(cfg["page_size"]) - 1) // int(cfg["page_size"]))
-        _inject_fixed_pager("movie", "Movies", int(cfg["page"]), int(total_pages))
-        _handle_query_nav("movie", "movie_page", int(total_pages))
-        _nav("movie", "top", cfg, total_pages, total, "movie_page")
+        nav._inject_fixed_pager("movie", "Movies", int(cfg["page"]), int(total_pages))
+        nav._handle_query_nav("movie", "movie_page", int(total_pages))
+        nav._nav("movie", "top", cfg, total_pages, total, "movie_page")
 
         if items:
-            _render_items(
+            render_items(
                 plex,
                 items,
                 type_id=type_id,
@@ -628,18 +639,18 @@ def main() -> None:
         else:
             st.info("No movies found for current filters.")
 
-        _nav("movie", "bottom", cfg, total_pages, total, "movie_page")
+        nav._nav("movie", "bottom", cfg, total_pages, total, "movie_page")
 
     # Shows
     with tab2:
-        cfg = _controls("show", sections=sections, required_type="2")
-        _inject_sticky_filters("TV Series", top_offset_px=48)
+        cfg = controls._controls("show", sections=sections, required_type="2")
+        nav._inject_sticky_filters("TV Series", top_offset_px=48)
         section_id = cfg["section_id"] or "2"
         type_id = "2"
 
         start = (int(cfg["page"]) - 1) * int(cfg["page_size"])
         try:
-            items, total = _cached_fetch(
+            items, total = cached_fetch(
                 plex.base_url,
                 plex.token,
                 section_id,
@@ -658,12 +669,12 @@ def main() -> None:
             items = [i for i in items if title_filter in (i.get("title", "").lower())]
 
         total_pages = max(1, (total + int(cfg["page_size"]) - 1) // int(cfg["page_size"]))
-        _inject_fixed_pager("show", "TV Series", int(cfg["page"]), int(total_pages))
-        _handle_query_nav("show", "show_page", int(total_pages))
-        _nav("show", "top", cfg, total_pages, total, "show_page")
+        nav._inject_fixed_pager("show", "TV Series", int(cfg["page"]), int(total_pages))
+        nav._handle_query_nav("show", "show_page", int(total_pages))
+        nav._nav("show", "top", cfg, total_pages, total, "show_page")
 
         if items:
-            _render_items(
+            render_items(
                 plex,
                 items,
                 type_id=type_id,
@@ -680,7 +691,7 @@ def main() -> None:
         else:
             st.info("No shows found for current filters.")
 
-        _nav("show", "bottom", cfg, total_pages, total, "show_page")
+        nav._nav("show", "bottom", cfg, total_pages, total, "show_page")
 
 
 def _inject_sticky_filters(tab_label: str, top_offset_px: int = 48) -> None:
@@ -738,6 +749,10 @@ def _inject_sticky_filters(tab_label: str, top_offset_px: int = 48) -> None:
 
 if __name__ == "__main__":
     main()
+
+
+
+
 
 
 
