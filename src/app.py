@@ -17,8 +17,6 @@ import ui_nav as nav
 import ui_controls as controls
 from data_cache import _cached_fetch as cached_fetch
 from ui_render import _render_items as render_items
-from streamlit import components
-from string import Template
 
 
 st.set_page_config(page_title="Plex Added Date Manager", layout="wide")
@@ -749,6 +747,7 @@ def _inject_sticky_filters(tab_label: str, top_offset_px: int = 48) -> None:
 
 if __name__ == "__main__":
     main()
+
 
 
 
