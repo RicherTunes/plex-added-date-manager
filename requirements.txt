@@ -3,3 +3,4 @@ plexapi
 pandas
 datetime
 python-dotenv
+requests
