@@ -1,6 +1,11 @@
+"""Streamlit UI for browsing and batch-editing Plex 'addedAt' dates.
 
-def _inject_fixed_pager(prefix: str, tab_label: str, page: int, total_pages: int) -> None:
-    return
+Highlights
+- Server-side pagination (container start/size)
+- Lightweight per-page title filter
+- Selection persists with batch updates and rate limiting
+- URL query params for pager navigation
+"""
 import datetime
 import time
 from typing import Dict, List, Tuple
@@ -237,10 +242,20 @@ def _apply_density():
         st.markdown(
             """
             <style>
+            /* Text sizes */
             .title-row h3 { font-size: 1.0rem; }
-            .meta { font-size: 0.8rem; }
-            .chip { font-size: 0.7rem; padding: 1px 6px; }
-            div[data-testid="stImage"] img { width: 96px !important; }
+            .meta { font-size: 0.82rem; }
+            .chip { font-size: 0.70rem; padding: 1px 6px; }
+            /* Widget sizes */
+            .stButton button { padding: 4px 8px; font-size: 0.85rem; }
+            div[data-baseweb="select"] > div { min-height: 32px; }
+            .stSelectbox label, .stTextInput label, .stDateInput label, .stNumberInput label { font-size: 0.85rem; margin-bottom: 0.15rem; }
+            .stTextInput input, .stNumberInput input, .stDateInput input { height: 32px; font-size: 0.9rem; }
+            .stCheckbox label { font-size: 0.9rem; }
+            /* Images */
+            div[data-testid="stImage"] img { width: 80px !important; }
+            /* Slightly tighter container */
+            .block-container { padding-top: 2.6rem; }
             </style>
             """,
             unsafe_allow_html=True,
@@ -329,6 +344,9 @@ def _render_items(
     title_filter: str,
     page_size: int,
 ) -> None:
+    density = st.session_state.get("ui_density", "Comfortable")
+    cols_widths = [0.16, 0.84] if density == "Compact" else [0.2, 0.8]
+    poster_w = 80 if density == "Compact" else 110
     selected: Dict[str, bool] = st.session_state.setdefault(select_key, {})
 
     # Batch controls
@@ -493,7 +511,7 @@ def _render_items(
     # Render list
     for item in items:
         rating_key = str(item.get("ratingKey"))
-        cols = st.columns([0.2, 0.8])
+        cols = st.columns(cols_widths)
         with cols[0]:
             checked = page_select_all or selected.get(rating_key, False)
             sel = st.checkbox("Select", key=f"{key_prefix}_sel_{rating_key}", value=checked)
@@ -502,7 +520,7 @@ def _render_items(
                 thumb = item.get("thumb")
                 url = plex.thumb_url(thumb)
                 if url:
-                    st.image(url, width=110)
+                    st.image(url, width=poster_w)
         with cols[1]:
             title = item.get("title", "Unknown")
             year = item.get("year")
