@@ -2,6 +2,9 @@ import os
 from typing import Dict, List, Optional, Tuple
 
 import requests
+from requests import Session
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -15,6 +18,24 @@ class PlexAPI:
             token = os.environ.get("PLEX_TOKEN")
         self.base_url = (base_url or "").rstrip("/")
         self.token = token or ""
+        self.session = self._build_session()
+
+    def _build_session(self) -> Session:
+        s = requests.Session()
+        retry = Retry(
+            total=5,
+            connect=5,
+            read=5,
+            status=5,
+            backoff_factor=0.5,
+            status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods={"GET", "PUT"},
+            raise_on_status=False,
+        )
+        adapter = HTTPAdapter(max_retries=retry)
+        s.mount("http://", adapter)
+        s.mount("https://", adapter)
+        return s
 
     def _get_headers(self) -> Dict[str, str]:
         return {
@@ -47,7 +68,7 @@ class PlexAPI:
         if filters:
             params.update({k: str(v) for k, v in filters.items() if v not in (None, "")})
 
-        response = requests.get(url, headers=self._get_headers(), params=params, timeout=30)
+        response = self.session.get(url, headers=self._get_headers(), params=params, timeout=30)
         response.raise_for_status()
         container = response.json().get("MediaContainer", {})
         items = container.get("Metadata", []) or []
@@ -86,7 +107,7 @@ class PlexAPI:
         }
         if lock:
             params["addedAt.locked"] = "1"
-        response = requests.put(url, params=params, headers=self._get_headers(), timeout=30)
+        response = self.session.put(url, params=params, headers=self._get_headers(), timeout=30)
         response.raise_for_status()
         return True
 
@@ -100,3 +121,21 @@ class PlexAPI:
             joiner = "&" if "?" in path else "?"
             return f"{path}{joiner}X-Plex-Token={self.token}"
         return f"{self.base_url}{path}?X-Plex-Token={self.token}"
+
+    # --- Sections ---
+    def get_sections(self) -> List[dict]:
+        """Return available library sections (key, title, type)."""
+        url = f"{self.base_url}/library/sections"
+        resp = self.session.get(url, headers=self._get_headers(), timeout=30)
+        resp.raise_for_status()
+        container = resp.json().get("MediaContainer", {})
+        dirs = container.get("Directory", []) or []
+        # Normalize fields
+        out: List[dict] = []
+        for d in dirs:
+            out.append({
+                "key": str(d.get("key")),
+                "title": d.get("title") or d.get("title1") or "Section",
+                "type": d.get("type"),  # e.g., 'movie', 'show', 'artist', etc.
+            })
+        return out

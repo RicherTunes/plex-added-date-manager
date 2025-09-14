@@ -51,7 +51,7 @@ def _init_state():
         st.session_state.setdefault(k, v)
 
 
-def _controls(prefix: str) -> Dict:
+def _controls(prefix: str, *, sections: List[dict], required_type: str) -> Dict:
     section_key = f"{prefix}_section"
     page_key = f"{prefix}_page"
     page_size_key = f"{prefix}_page_size"
@@ -62,9 +62,25 @@ def _controls(prefix: str) -> Dict:
     item_edit_key = f"{prefix}_show_item_edit"
     lock_key = f"{prefix}_lock_added"
 
-    c1, c2, c3, c4, c5, c6 = st.columns([1, 1, 1.2, 1, 1.5, 1])
+    # Build section options filtered by type
+    typed_sections = [s for s in sections if s.get("type") == ("movie" if required_type == "1" else "show")]
+    # Option labels
+    options = [f"{s['title']} (#{s['key']})" for s in typed_sections] or []
+    key_by_label = {f"{s['title']} (#{s['key']})": s["key"] for s in typed_sections}
+
+    c1, c2, c3, c4, c5, c6 = st.columns([1.5, 1, 1.2, 1, 1.5, 1])
     with c1:
-        st.text_input("Section ID", key=section_key)
+        if options:
+            default_label = None
+            # pick current value if present
+            for lbl, key in key_by_label.items():
+                if key == st.session_state[section_key]:
+                    default_label = lbl
+                    break
+            selection = st.selectbox("Section", options=options, index=(options.index(default_label) if default_label in options else 0))
+            st.session_state[section_key] = key_by_label.get(selection, st.session_state[section_key])
+        else:
+            st.text_input("Section ID", key=section_key)
     with c2:
         st.selectbox("Page Size", [50, 100, 200], key=page_size_key)
     with c3:
@@ -123,6 +139,11 @@ def _render_items(
     show_item_edit: bool,
     lock_added: bool,
     section_id: str,
+    # for select-all across results
+    sort: str,
+    year: str,
+    title_filter: str,
+    page_size: int,
 ):
     selected: Dict[str, bool] = st.session_state.setdefault(select_key, {})
 
@@ -130,6 +151,43 @@ def _render_items(
     left, mid, right = st.columns([2, 3, 2])
     with left:
         page_select_all = st.checkbox("Select all on page", key=f"{key_prefix}_select_all")
+        b1, b2 = st.columns(2)
+        with b1:
+            if st.button("Select all results", key=f"{key_prefix}_select_all_results"):
+                # Enumerate across all pages with current filters
+                progress = st.progress(0)
+                selected_count = 0
+                try:
+                    start = 0
+                    total_known = None
+                    while True:
+                        batch_items, total = plex.fetch_items(
+                            section_id,
+                            type_id,
+                            start=start,
+                            size=page_size,
+                            sort=sort,
+                            filters=({"year": year} if year else None),
+                        )
+                        total_known = total
+                        if title_filter:
+                            batch_items = [i for i in batch_items if title_filter in (i.get("title", "").lower())]
+                        for it in batch_items:
+                            rk = str(it.get("ratingKey"))
+                            if rk:
+                                selected[rk] = True
+                                selected_count += 1
+                        start += page_size
+                        if start >= total:
+                            break
+                        progress.progress(min(100, int(start * 100 / max(1, total))))
+                finally:
+                    progress.progress(100)
+                st.success(f"Selected {selected_count} items across all results (total ~{total_known}).")
+        with b2:
+            if st.button("Clear all", key=f"{key_prefix}_clear_all"):
+                selected.clear()
+                st.success("Cleared all selections.")
     with mid:
         batch_date = st.date_input("Batch date", value=datetime.date.today(), key=f"{key_prefix}_batch_date")
     with right:
@@ -204,26 +262,36 @@ def main():
     if not plex.base_url or not plex.token:
         st.error("Missing PLEX_BASE_URL or PLEX_TOKEN in environment (.env).")
         st.stop()
+    # Load sections once
+    try:
+        sections = plex.get_sections()
+    except Exception as e:
+        sections = []
+        st.warning(f"Could not list library sections: {e}")
 
     tab1, tab2 = st.tabs(["Movies", "TV Series"])  # TV Series == shows (type=2)
 
     # --- Movies Tab ---
     with tab1:
-        cfg = _controls("movie")
+        cfg = _controls("movie", sections=sections, required_type="1")
         section_id = cfg["section_id"] or "1"
         type_id = "1"
 
         start = (cfg["page"] - 1) * int(cfg["page_size"])
-        items, total = _cached_fetch(
-            plex.base_url,
-            plex.token,
-            section_id,
-            type_id,
-            start,
-            int(cfg["page_size"]),
-            cfg["sort"],
-            cfg["year"] or "",
-        )
+        try:
+            items, total = _cached_fetch(
+                plex.base_url,
+                plex.token,
+                section_id,
+                type_id,
+                start,
+                int(cfg["page_size"]),
+                cfg["sort"],
+                cfg["year"] or "",
+            )
+        except Exception as e:
+            st.error(f"Failed to fetch items for section {section_id}: {e}")
+            items, total = [], 0
 
         # Optional client-side title filter (applies to current page only)
         title_filter = (cfg["title"] or "").strip().lower()
@@ -255,27 +323,35 @@ def main():
                 show_item_edit=cfg["show_item_edit"],
                 lock_added=cfg["lock"],
                 section_id=section_id,
+                sort=cfg["sort"],
+                year=cfg["year"] or "",
+                title_filter=title_filter,
+                page_size=int(cfg["page_size"]),
             )
         else:
             st.info("No movies found for current filters.")
 
     # --- TV Series (Shows) Tab ---
     with tab2:
-        cfg = _controls("show")
+        cfg = _controls("show", sections=sections, required_type="2")
         section_id = cfg["section_id"] or "2"
         type_id = "2"  # show
 
         start = (cfg["page"] - 1) * int(cfg["page_size"])
-        items, total = _cached_fetch(
-            plex.base_url,
-            plex.token,
-            section_id,
-            type_id,
-            start,
-            int(cfg["page_size"]),
-            cfg["sort"],
-            cfg["year"] or "",
-        )
+        try:
+            items, total = _cached_fetch(
+                plex.base_url,
+                plex.token,
+                section_id,
+                type_id,
+                start,
+                int(cfg["page_size"]),
+                cfg["sort"],
+                cfg["year"] or "",
+            )
+        except Exception as e:
+            st.error(f"Failed to fetch items for section {section_id}: {e}")
+            items, total = [], 0
 
         title_filter = (cfg["title"] or "").strip().lower()
         if title_filter:
@@ -306,6 +382,10 @@ def main():
                 show_item_edit=cfg["show_item_edit"],
                 lock_added=cfg["lock"],
                 section_id=section_id,
+                sort=cfg["sort"],
+                year=cfg["year"] or "",
+                title_filter=title_filter,
+                page_size=int(cfg["page_size"]),
             )
         else:
             st.info("No shows found for current filters.")
@@ -313,4 +393,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

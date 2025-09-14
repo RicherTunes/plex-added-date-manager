@@ -8,6 +8,7 @@ param(
   [int]$PageSize = 200,
   [int]$MaxItems,
   [double]$Sleep = 0,
+  [double]$MaxPerMinute,
   [switch]$NoLock,
   [switch]$DryRun,
   [string]$BaseUrl,
@@ -38,6 +39,7 @@ if ($TitleContains) { $argsList += @(''--title-contains'', $TitleContains) }
 if ($Ids) { $argsList += @(''--ids''); $argsList += $Ids }
 if ($MaxItems) { $argsList += @(''--max-items'', $MaxItems) }
 if ($Sleep) { $argsList += @(''--sleep'', $Sleep) }
+if ($MaxPerMinute) { $argsList += @(''--max-per-minute'', $MaxPerMinute) }
 if ($NoLock) { $argsList += @(''--no-lock'') }
 if ($DryRun) { $argsList += @(''--dry-run'') }
 if ($BaseUrl) { $argsList += @(''--base-url'', $BaseUrl) }

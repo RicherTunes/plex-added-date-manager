@@ -30,6 +30,7 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     p.add_argument("--page-size", type=int, default=200, help="Fetch page size (default 200)")
     p.add_argument("--max-items", type=int, help="Stop after updating N matched items")
     p.add_argument("--sleep", type=float, default=0.0, help="Sleep seconds between updates (throttle)")
+    p.add_argument("--max-per-minute", type=float, help="Max updates per minute (rate limit)")
     p.add_argument("--no-lock", action="store_true", help="Do not lock the addedAt field after update")
     p.add_argument("--base-url", help="Override PLEX_BASE_URL")
     p.add_argument("--token", help="Override PLEX_TOKEN")
@@ -119,20 +120,37 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     print(f"Matched {len(ids)} items. {'DRY RUN' if args.dry_run else ''}")
     updated = 0
+    # Derived throttle from max-per-minute
+    rate_sleep = 0.0
+    if args.max_per_minute and args.max_per_minute > 0:
+        rate_sleep = max(0.0, 60.0 / float(args.max_per_minute))
+    per_item_sleep = max(float(args.sleep), rate_sleep)
     for idx, rk in enumerate(ids, start=1):
         if args.max_items and updated >= args.max_items:
             break
         if args.dry_run:
             print(f"Would update id={rk} to {args.date} (unix={new_unix})")
         else:
-            try:
-                plex.update_added_date(args.section_id, rk, type_id, new_unix, lock=lock)
-                print(f"[{idx}/{len(ids)}] Updated id={rk}")
-                updated += 1
-            except Exception as e:  # noqa: BLE001
-                print(f"[{idx}/{len(ids)}] Failed id={rk}: {e}", file=sys.stderr)
-        if args.sleep:
-            time.sleep(args.sleep)
+            # Simple retry with backoff in addition to HTTPAdapter retries
+            attempts = 0
+            last_err = None
+            while attempts < 4:
+                try:
+                    plex.update_added_date(args.section_id, rk, type_id, new_unix, lock=lock)
+                    print(f"[{idx}/{len(ids)}] Updated id={rk}")
+                    updated += 1
+                    last_err = None
+                    break
+                except Exception as e:  # noqa: BLE001
+                    attempts += 1
+                    last_err = e
+                    sleep_for = min(8, 0.5 * (2 ** (attempts - 1)))
+                    print(f"[{idx}/{len(ids)}] Retry {attempts}/3 after error: {e}")
+                    time.sleep(sleep_for)
+            if last_err is not None:
+                print(f"[{idx}/{len(ids)}] Failed id={rk}: {last_err}", file=sys.stderr)
+        if per_item_sleep:
+            time.sleep(per_item_sleep)
 
     print(f"Done. Updated {updated} item(s).")
     return 0
@@ -140,4 +158,3 @@ def main(argv: Optional[List[str]] = None) -> int:
 
 if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(main())
-
