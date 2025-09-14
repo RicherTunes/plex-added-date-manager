@@ -6,57 +6,56 @@ import streamlit as st
 
 from plex_api import PlexAPI
 
+
 st.set_page_config(page_title="Plex Added Date Manager", layout="wide")
-# Lightweight styling for metadata
+
+# Lightweight styling
 st.markdown(
     """
     <style>
-    .meta { color:#6b7280; font-size:0.85rem; margin:4px 0 10px; }
+    .meta { color:#6b7280; font-size:0.9rem; margin:4px 0 0; }
     .title-row h3 { margin-bottom: 2px; }
+    .subtle { color:#6b7280; }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
 
-def _safe_rerun():
-    """Rerun compatible across Streamlit versions."""
+def _safe_rerun() -> None:
     try:
-        # Streamlit >= 1.27
         if hasattr(st, "rerun"):
             st.rerun()
             return
-        # Legacy
-        if hasattr(st, "_safe_rerun"):
-            _safe_rerun()
+        if hasattr(st, "experimental_rerun"):
+            st.experimental_rerun()
             return
     except Exception:
         pass
 
 
-def _nav(prefix: str, position: str, cfg: Dict, total_pages: int, total: int, page_state_key: str):
-    """Render a navigation bar with Prev/Next and Go-to-page controls."""
+def _nav(prefix: str, position: str, cfg: Dict, total_pages: int, total: int, page_state_key: str) -> None:
     nav_l, nav_c, nav_r = st.columns([1, 2, 2])
     with nav_l:
-        if st.button("◀ Prev", key=f"{prefix}_{position}_prev", disabled=cfg["page"] <= 1):
-            st.session_state[page_state_key] = max(1, cfg["page"] - 1)
+        if st.button("< Prev", key=f"{prefix}_{position}_prev", disabled=cfg["page"] <= 1):
+            st.session_state[page_state_key] = max(1, int(cfg["page"]) - 1)
             _safe_rerun()
     with nav_c:
-        st.write(f"Page {cfg['page']} of {total_pages} • Total {total}")
+        st.write(f"Page {cfg['page']} of {total_pages} - Total {total}")
     with nav_r:
         goto = st.number_input(
             "Go to page",
             min_value=1,
             max_value=max(1, int(total_pages)),
-            value=int(min(max(1, cfg["page"]), max(1, total_pages))),
+            value=int(min(max(1, int(cfg["page"])), max(1, int(total_pages)))),
             step=1,
             key=f"{prefix}_{position}_goto",
         )
         if st.button("Go", key=f"{prefix}_{position}_go"):
             st.session_state[page_state_key] = int(goto)
             _safe_rerun()
-        if st.button("Next ▶", key=f"{prefix}_{position}_next", disabled=cfg["page"] >= total_pages):
-            st.session_state[page_state_key] = min(total_pages, cfg["page"] + 1)
+        if st.button("Next >", key=f"{prefix}_{position}_next", disabled=int(cfg["page"]) >= int(total_pages)):
+            st.session_state[page_state_key] = min(int(total_pages), int(cfg["page"]) + 1)
             _safe_rerun()
 
 
@@ -76,13 +75,12 @@ def _cached_fetch(
     return p.fetch_items(section_id, type_id, start=start, size=size, sort=sort, filters=filters)
 
 
-def _init_state():
+def _init_state() -> None:
     defaults = {
         "movie_page": 1,
         "movie_page_size": 100,
         "movie_selected": {},
         "movie_show_images": True,
-        "movie_show_item_edit": False,
         "movie_sort": "addedAt:desc",
         "movie_year_filter": "",
         "movie_title_filter": "",
@@ -92,7 +90,6 @@ def _init_state():
         "show_page_size": 100,
         "show_selected": {},
         "show_show_images": True,
-        "show_show_item_edit": False,
         "show_sort": "addedAt:desc",
         "show_year_filter": "",
         "show_title_filter": "",
@@ -111,61 +108,52 @@ def _controls(prefix: str, *, sections: List[dict], required_type: str) -> Dict:
     year_key = f"{prefix}_year_filter"
     title_key = f"{prefix}_title_filter"
     images_key = f"{prefix}_show_images"
-    item_edit_key = f"{prefix}_show_item_edit"
     lock_key = f"{prefix}_lock_added"
 
-    # Build section options filtered by type
-    typed_sections = [s for s in sections if s.get("type") == ("movie" if required_type == "1" else "show")]
-    # Option labels
-    options = [f"{s['title']} (#{s['key']})" for s in typed_sections] or []
-    key_by_label = {f"{s['title']} (#{s['key']})": s["key"] for s in typed_sections}
+    # Section dropdown (filtered by type)
+    typed = [s for s in sections if s.get("type") == ("movie" if required_type == "1" else "show")]
+    labels = [f"{s['title']} (#{s['key']})" for s in typed]
+    label_to_key = {f"{s['title']} (#{s['key']})": s["key"] for s in typed}
 
-    c1, c2, c3, c4, c5, c6 = st.columns([1.5, 1, 1.2, 1, 1.5, 1])
-    with c1:
-        if options:
-            default_label = None
-            # pick current value if present
-            for lbl, key in key_by_label.items():
-                if key == st.session_state[section_key]:
-                    default_label = lbl
-                    break
-            selection = st.selectbox("Section", options=options, index=(options.index(default_label) if default_label in options else 0))
-            st.session_state[section_key] = key_by_label.get(selection, st.session_state[section_key])
+    r1c1, r1c2, r1c3, r1c4, r1c5, r1c6 = st.columns([2, 1, 1.2, 1, 1.5, 1])
+    with r1c1:
+        if labels:
+            # preserve current selection if possible
+            curr = st.session_state.get(section_key)
+            try:
+                idx = labels.index(next(l for l in labels if label_to_key[l] == curr))
+            except Exception:
+                idx = 0
+            chosen = st.selectbox("Section", options=labels, index=idx, key=f"{prefix}_section_label")
+            st.session_state[section_key] = label_to_key[chosen]
         else:
             st.text_input("Section ID", key=section_key)
-    with c2:
+    with r1c2:
         st.selectbox("Page Size", [50, 100, 200], key=page_size_key)
-    with c3:
+    with r1c3:
         st.selectbox(
             "Sort",
-            [
-                "addedAt:desc",
-                "addedAt:asc",
-                "titleSort:asc",
-                "titleSort:desc",
-                "year:desc",
-                "year:asc",
-            ],
+            ["addedAt:desc", "addedAt:asc", "titleSort:asc", "titleSort:desc", "year:desc", "year:asc"],
             key=sort_key,
         )
-    with c4:
+    with r1c4:
         st.text_input("Year", key=year_key, placeholder="e.g. 2021")
-    with c5:
+    with r1c5:
         st.text_input("Title contains", key=title_key)
-    with c6:
-        st.checkbox("Show images", key=images_key, value=st.session_state[images_key])
+    with r1c6:
+        st.checkbox("Show images", key=images_key)
 
-    c7, c8, c9 = st.columns([1, 1, 2])
-    with c7:
-        st.checkbox("Per-item edit", key=item_edit_key, value=st.session_state[item_edit_key])
-    with c8:
-        st.checkbox("Lock added date", key=lock_key, value=st.session_state[lock_key])
-    with c9:
+    r2c1, r2c2, r2c3 = st.columns([1, 1, 3])
+    with r2c1:
+        st.checkbox("Lock added date", key=lock_key)
+    with r2c2:
         if st.button("Reset Filters", key=f"{prefix}_reset"):
             st.session_state[year_key] = ""
             st.session_state[title_key] = ""
             st.session_state[sort_key] = "addedAt:desc"
             st.session_state[page_key] = 1
+    with r2c3:
+        st.caption("Tip: use bottom pager to jump to any page.")
 
     return {
         "section_id": st.session_state[section_key],
@@ -175,7 +163,6 @@ def _controls(prefix: str, *, sections: List[dict], required_type: str) -> Dict:
         "year": st.session_state[year_key],
         "title": st.session_state[title_key],
         "show_images": st.session_state[images_key],
-        "show_item_edit": st.session_state[item_edit_key],
         "lock": st.session_state[lock_key],
     }
 
@@ -188,15 +175,13 @@ def _render_items(
     select_key: str,
     key_prefix: str,
     show_images: bool,
-    show_item_edit: bool,
     lock_added: bool,
     section_id: str,
-    # for select-all across results
     sort: str,
     year: str,
     title_filter: str,
     page_size: int,
-):
+) -> None:
     selected: Dict[str, bool] = st.session_state.setdefault(select_key, {})
 
     # Batch controls
@@ -206,7 +191,6 @@ def _render_items(
         b1, b2, b3 = st.columns(3)
         with b1:
             if st.button("Select all results", key=f"{key_prefix}_select_all_results"):
-                # Enumerate across all pages with current filters
                 progress = st.progress(0)
                 selected_count = 0
                 try:
@@ -235,7 +219,7 @@ def _render_items(
                         progress.progress(min(100, int(start * 100 / max(1, total))))
                 finally:
                     progress.progress(100)
-                st.success(f"Selected {selected_count} items across all results (total ~{total_known}).")
+                st.success(f"Selected {selected_count} items across results (total ~{total_known}).")
         with b2:
             if st.button("Clear all", key=f"{key_prefix}_clear_all"):
                 selected.clear()
@@ -257,32 +241,29 @@ def _render_items(
                 st.warning("No items selected.")
             else:
                 new_unix = int(datetime.datetime.combine(batch_date, datetime.time.min).timestamp())
-                total = len(keys)
+                total_sel = len(keys)
                 progress = st.progress(0)
                 successes = 0
                 per_item_sleep = (60.0 / max_per_min) if max_per_min and max_per_min > 0 else 0.0
                 for idx, rating_key in enumerate(keys, start=1):
-                    try:
-                        attempts = 0
-                        last_err = None
-                        while attempts < 4:
-                            try:
-                                plex.update_added_date(section_id, rating_key, type_id, new_unix, lock=lock_added)
-                                successes += 1
-                                last_err = None
-                                break
-                            except Exception as e:  # noqa: BLE001
-                                attempts += 1
-                                last_err = e
-                                backoff = min(8, 0.5 * (2 ** (attempts - 1)))
-                                time.sleep(backoff)
-                        if last_err is not None:
-                            st.error(f"Failed updating id={rating_key}: {last_err}")
-                    finally:
-                        progress.progress(int(idx * 100 / total))
-                        if per_item_sleep:
-                            time.sleep(per_item_sleep)
-                st.success(f"Updated {successes}/{total} items.")
+                    last_err = None
+                    attempts = 0
+                    while attempts < 4:
+                        try:
+                            plex.update_added_date(section_id, rating_key, type_id, new_unix, lock=lock_added)
+                            successes += 1
+                            last_err = None
+                            break
+                        except Exception as e:  # noqa: BLE001
+                            attempts += 1
+                            last_err = e
+                            time.sleep(min(8, 0.5 * (2 ** (attempts - 1))))
+                    if last_err is not None:
+                        st.error(f"Failed updating id={rating_key}: {last_err}")
+                    progress.progress(int(idx * 100 / total_sel))
+                    if per_item_sleep:
+                        time.sleep(per_item_sleep)
+                st.success(f"Updated {successes}/{total_sel} items.")
 
     # Selection summary
     total_selected = sum(1 for v in selected.values() if v)
@@ -304,41 +285,39 @@ def _render_items(
         with cols[1]:
             title = item.get("title", "Unknown")
             year = item.get("year")
-            rel = item.get("originallyAvailableAt")
+            rel = item.get("originallyAvailableAt") or "-"
             display = f"{title} ({year})" if year else title
-            if rel:
-                st.markdown(
-                    f"<div class='title-row'><h3 title='Release Date: {rel}'>{display}</h3></div>",
-                    unsafe_allow_html=True,
-                )
-            else:
-                st.markdown(f"<div class='title-row'><h3>{display}</h3></div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='title-row'><h3>{display}</h3></div>", unsafe_allow_html=True)
 
+            # Added (inline editable)
             added_at = item.get("addedAt")
             if added_at:
                 added_dt = datetime.datetime.fromtimestamp(int(added_at))
             else:
                 added_dt = datetime.datetime.now()
-            added_label = added_dt.strftime("%Y-%m-%d")
-            rel_label = rel or "—"
-            st.markdown(
-                f"<div class='meta'>Added: <strong>{added_label}</strong> • Release: {rel_label} • ID: {rating_key}</div>",
-                unsafe_allow_html=True,
-            )
 
-            if show_item_edit:
-                new_date = st.date_input(
-                    "Edit Added Date",
-                    value=added_dt.date(),
-                    key=f"{key_prefix}_date_{rating_key}",
-                )
-                new_unix = int(datetime.datetime.combine(new_date, datetime.time.min).timestamp())
-                if st.button("Update Date", key=f"{key_prefix}_update_{rating_key}"):
-                    plex.update_added_date(section_id, rating_key, type_id, new_unix, lock=lock_added)
-                    st.success(f"Updated added date for {title} to {new_date}")
+            date_key = f"{key_prefix}_date_{rating_key}"
+
+            def _on_change_inline(rk=rating_key):
+                try:
+                    d = st.session_state[date_key]
+                    new_unix = int(datetime.datetime.combine(d, datetime.time.min).timestamp())
+                    plex.update_added_date(section_id, rk, type_id, new_unix, lock=lock_added)
+                    st.toast(f"Saved {title}") if hasattr(st, "toast") else st.success(f"Saved {title}")
+                except Exception as e:  # noqa: BLE001
+                    st.error(f"Failed to save {title}: {e}")
+
+            date_kwargs = {}
+            if date_key not in st.session_state:
+                date_kwargs["value"] = added_dt.date()
+            st.date_input("Added", key=date_key, on_change=_on_change_inline, **date_kwargs)
+
+            # Secondary info
+            st.caption(f"Release: {rel}")
+            st.caption(f"ID: {rating_key}")
 
 
-def main():
+def main() -> None:
     st.markdown("<h2 style='text-align: center;'>Plex Added Date Manager</h2>", unsafe_allow_html=True)
     _init_state()
 
@@ -346,7 +325,7 @@ def main():
     if not plex.base_url or not plex.token:
         st.error("Missing PLEX_BASE_URL or PLEX_TOKEN in environment (.env).")
         st.stop()
-    # Load sections once
+
     try:
         sections = plex.get_sections()
     except Exception as e:
@@ -355,13 +334,13 @@ def main():
 
     tab1, tab2 = st.tabs(["Movies", "TV Series"])  # TV Series == shows (type=2)
 
-    # --- Movies Tab ---
+    # Movies
     with tab1:
         cfg = _controls("movie", sections=sections, required_type="1")
         section_id = cfg["section_id"] or "1"
         type_id = "1"
 
-        start = (cfg["page"] - 1) * int(cfg["page_size"])
+        start = (int(cfg["page"]) - 1) * int(cfg["page_size"])
         try:
             items, total = _cached_fetch(
                 plex.base_url,
@@ -377,24 +356,13 @@ def main():
             st.error(f"Failed to fetch items for section {section_id}: {e}")
             items, total = [], 0
 
-        # Optional client-side title filter (applies to current page only)
+        # Filter title (current page)
         title_filter = (cfg["title"] or "").strip().lower()
         if title_filter:
             items = [i for i in items if title_filter in (i.get("title", "").lower())]
 
         total_pages = max(1, (total + int(cfg["page_size"]) - 1) // int(cfg["page_size"]))
-
-        nav_l, nav_c, nav_r = st.columns([1, 2, 1])
-        with nav_l:
-            if st.button("◀ Prev", key="movie_prev", disabled=cfg["page"] <= 1):
-                st.session_state["movie_page"] = max(1, cfg["page"] - 1)
-                _safe_rerun()
-        with nav_c:
-            st.write(f"Page {cfg['page']} of {total_pages} • Total {total}")
-        with nav_r:
-            if st.button("Next ▶", key="movie_next", disabled=cfg["page"] >= total_pages):
-                st.session_state["movie_page"] = min(total_pages, cfg["page"] + 1)
-                _safe_rerun()
+        _nav("movie", "top", cfg, total_pages, total, "movie_page")
 
         if items:
             _render_items(
@@ -404,7 +372,6 @@ def main():
                 select_key="movie_selected",
                 key_prefix="movie",
                 show_images=cfg["show_images"],
-                show_item_edit=cfg["show_item_edit"],
                 lock_added=cfg["lock"],
                 section_id=section_id,
                 sort=cfg["sort"],
@@ -415,16 +382,15 @@ def main():
         else:
             st.info("No movies found for current filters.")
 
-        # Bottom navigation
         _nav("movie", "bottom", cfg, total_pages, total, "movie_page")
 
-    # --- TV Series (Shows) Tab ---
+    # Shows
     with tab2:
         cfg = _controls("show", sections=sections, required_type="2")
         section_id = cfg["section_id"] or "2"
-        type_id = "2"  # show
+        type_id = "2"
 
-        start = (cfg["page"] - 1) * int(cfg["page_size"])
+        start = (int(cfg["page"]) - 1) * int(cfg["page_size"])
         try:
             items, total = _cached_fetch(
                 plex.base_url,
@@ -445,18 +411,7 @@ def main():
             items = [i for i in items if title_filter in (i.get("title", "").lower())]
 
         total_pages = max(1, (total + int(cfg["page_size"]) - 1) // int(cfg["page_size"]))
-
-        nav_l, nav_c, nav_r = st.columns([1, 2, 1])
-        with nav_l:
-            if st.button("◀ Prev", key="show_prev", disabled=cfg["page"] <= 1):
-                st.session_state["show_page"] = max(1, cfg["page"] - 1)
-                _safe_rerun()
-        with nav_c:
-            st.write(f"Page {cfg['page']} of {total_pages} • Total {total}")
-        with nav_r:
-            if st.button("Next ▶", key="show_next", disabled=cfg["page"] >= total_pages):
-                st.session_state["show_page"] = min(total_pages, cfg["page"] + 1)
-                _safe_rerun()
+        _nav("show", "top", cfg, total_pages, total, "show_page")
 
         if items:
             _render_items(
@@ -466,7 +421,6 @@ def main():
                 select_key="show_selected",
                 key_prefix="show",
                 show_images=cfg["show_images"],
-                show_item_edit=cfg["show_item_edit"],
                 lock_added=cfg["lock"],
                 section_id=section_id,
                 sort=cfg["sort"],
@@ -477,17 +431,9 @@ def main():
         else:
             st.info("No shows found for current filters.")
 
-        # Bottom navigation
         _nav("show", "bottom", cfg, total_pages, total, "show_page")
 
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-
 
