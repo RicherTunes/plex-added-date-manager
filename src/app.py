@@ -17,7 +17,7 @@ st.markdown(
     .title-row h3 { margin-bottom: 2px; }
     .subtle { color:#6b7280; }
     .chip { display:inline-block; background:#eef2ff; color:#3730a3; padding:2px 8px; border-radius:12px; font-size:0.75rem; margin-right:6px; }
-    .block-container { padding-top: .5rem; }
+    .block-container { padding-top: .25rem; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -97,9 +97,26 @@ def _init_state() -> None:
         "show_title_filter": "",
         "show_section": "2",
         "show_lock_added": True,
+        "ui_density": "Comfortable",
     }
     for k, v in defaults.items():
         st.session_state.setdefault(k, v)
+
+
+def _apply_density():
+    density = st.session_state.get("ui_density", "Comfortable")
+    if density == "Compact":
+        st.markdown(
+            """
+            <style>
+            .title-row h3 { font-size: 1.0rem; }
+            .meta { font-size: 0.8rem; }
+            .chip { font-size: 0.7rem; padding: 1px 6px; }
+            div[data-testid="stImage"] img { width: 96px !important; }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
 
 
 def _controls(prefix: str, *, sections: List[dict], required_type: str) -> Dict:
@@ -117,7 +134,7 @@ def _controls(prefix: str, *, sections: List[dict], required_type: str) -> Dict:
     labels = [f"{s['title']} (#{s['key']})" for s in typed]
     label_to_key = {f"{s['title']} (#{s['key']})": s["key"] for s in typed}
 
-    r1c1, r1c2, r1c3, r1c4, r1c5, r1c6 = st.columns([2, 1, 1.2, 1, 1.5, 1])
+    r1c1, r1c2, r1c3, r1c4, r1c5, r1c6 = st.columns([2.4, 1, 1.2, 1, 1.4, 1])
     with r1c1:
         if labels:
             # preserve current selection if possible
@@ -155,7 +172,7 @@ def _controls(prefix: str, *, sections: List[dict], required_type: str) -> Dict:
             st.session_state[sort_key] = "addedAt:desc"
             st.session_state[page_key] = 1
     with r2c3:
-        st.caption("Tip: use bottom pager to jump to any page.")
+        st.caption("Tip: Use the pager to jump to any page.")
 
     return {
         "section_id": st.session_state[section_key],
@@ -273,11 +290,38 @@ def _render_items(
 
     # Date range selection (advanced)
     with st.expander("Select by Added date range", expanded=False):
+        presets = st.columns([1,1,1,1,1,1,1])
+        today = datetime.date.today()
+        # Preset handlers
+        preset_actions = {
+            "Last 7": (today - datetime.timedelta(days=7), today),
+            "Last 30": (today - datetime.timedelta(days=30), today),
+            "Last 90": (today - datetime.timedelta(days=90), today),
+            "Last 365": (today - datetime.timedelta(days=365), today),
+            "This Year": (datetime.date(today.year, 1, 1), today),
+            
+        }
+        keys = list(preset_actions.keys())
+        for i, name in enumerate(keys):
+            with presets[i]:
+                if st.button(name, key=f"{key_prefix}_preset_{name}"):
+                    start, end = preset_actions[name]
+                    st.session_state[f"{key_prefix}_range_from"] = start
+                    st.session_state[f"{key_prefix}_range_to"] = end
+        with presets[-2]:
+            if st.button("Older >1y", key=f"{key_prefix}_preset_older"):
+                st.session_state[f"{key_prefix}_range_from"] = today - datetime.timedelta(days=365*50)
+                st.session_state[f"{key_prefix}_range_to"] = today - datetime.timedelta(days=365)
+        with presets[-1]:
+            if st.button("Clear", key=f"{key_prefix}_preset_clear"):
+                st.session_state.pop(f"{key_prefix}_range_from", None)
+                st.session_state.pop(f"{key_prefix}_range_to", None)
+
         rc1, rc2 = st.columns(2)
         with rc1:
-            range_from = st.date_input("From", key=f"{key_prefix}_range_from", value=datetime.date.today() - datetime.timedelta(days=365))
+            range_from = st.date_input("From", key=f"{key_prefix}_range_from", value=st.session_state.get(f"{key_prefix}_range_from", today - datetime.timedelta(days=365)))
         with rc2:
-            range_to = st.date_input("To", key=f"{key_prefix}_range_to", value=datetime.date.today())
+            range_to = st.date_input("To", key=f"{key_prefix}_range_to", value=st.session_state.get(f"{key_prefix}_range_to", today))
         act1, act2 = st.columns(2)
         def _select_range(select: bool):
             start_ts = int(datetime.datetime.combine(range_from, datetime.time.min).timestamp())
@@ -366,7 +410,13 @@ def _render_items(
 
 
 def main() -> None:
-    st.markdown("<h2 style='text-align: center;'>Plex Added Date Manager</h2>", unsafe_allow_html=True)
+    # Header row with density selector
+    hdr_l, hdr_r = st.columns([3, 1])
+    with hdr_l:
+        st.markdown("<h3 style='margin-bottom:0.25rem'>Plex Added Date Manager</h3>", unsafe_allow_html=True)
+    with hdr_r:
+        st.selectbox("Density", ["Comfortable", "Compact"], key="ui_density")
+    _apply_density()
     _init_state()
 
     plex = PlexAPI()
