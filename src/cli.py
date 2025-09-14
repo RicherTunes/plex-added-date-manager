@@ -1,3 +1,18 @@
+"""Command-line batch updater for Plex addedAt dates.
+
+This CLI complements the Streamlit UI by providing a way to:
+- Discover library sections
+- Filter items by year and title
+- Update the `addedAt` timestamp for many items efficiently with optional
+  locking and rate limiting
+
+Environment variables
+- `PLEX_BASE_URL`: Base URL of your Plex server (e.g., http://192.168.1.10:32400)
+- `PLEX_TOKEN`: Plex X-Plex-Token value
+
+See README.md for examples, or invoke with `-h` for help.
+"""
+
 import argparse
 import datetime
 import os
@@ -11,6 +26,14 @@ from plex_api import PlexAPI
 
 
 def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
+    """Parse command-line arguments.
+
+    Parameters
+    - argv: Optional argument list. When None, uses ``sys.argv``.
+
+    Returns
+    - argparse.Namespace with parsed values
+    """
     p = argparse.ArgumentParser(
         prog="plex-added-date-cli",
         description="Batch update Plex addedAt dates using filters or explicit ids.",
@@ -45,6 +68,10 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
 
 
 def to_unix(date_str: str) -> int:
+    """Convert a YYYY-MM-DD date string to a midnight UTC Unix timestamp.
+
+    Raises SystemExit with a helpful message when the format is invalid.
+    """
     try:
         dt = datetime.datetime.strptime(date_str, "%Y-%m-%d")
     except ValueError as e:
@@ -60,6 +87,11 @@ def iter_ids_from_fetch(
     year: Optional[str],
     title_contains: Optional[str],
 ) -> Iterable[str]:
+    """Yield ratingKeys for items matching the given filters.
+
+    Uses server-side pagination and optional client-side title filtering to
+    avoid loading the entire library at once.
+    """
     filters: Dict[str, str] = {}
     if year:
         filters["year"] = str(year)
@@ -90,6 +122,7 @@ def iter_ids_from_fetch(
 
 
 def main(argv: Optional[List[str]] = None) -> int:
+    """CLI entrypoint. Returns a conventional exit code (0 on success)."""
     load_dotenv()
     args = parse_args(argv)
 

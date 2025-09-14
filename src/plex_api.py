@@ -1,3 +1,12 @@
+"""Thin wrapper around the Plex HTTP API used by the UI and CLI.
+
+Responsibilities
+- Build a retrying `requests.Session` tuned for Plex endpoints
+- Fetch items with pagination and basic filters
+- Update the `addedAt` field with optional locking
+- Provide helpers for section discovery and thumbnail URLs
+"""
+
 import os
 from typing import Dict, List, Optional, Tuple
 
@@ -11,6 +20,12 @@ load_dotenv()
 
 
 class PlexAPI:
+    """Simple client for interacting with a Plex server.
+
+    Parameters
+    - base_url: Base server URL (e.g., http://host:32400). Falls back to env var `PLEX_BASE_URL`.
+    - token: Plex token. Falls back to env var `PLEX_TOKEN`.
+    """
     def __init__(self, base_url: Optional[str] = None, token: Optional[str] = None):
         if base_url is None:
             base_url = os.environ.get("PLEX_BASE_URL")
@@ -21,6 +36,10 @@ class PlexAPI:
         self.session = self._build_session()
 
     def _build_session(self) -> Session:
+        """Return a `requests.Session` with sensible retries for Plex.
+
+        Retries on 429/5xx with exponential backoff for GET/PUT.
+        """
         s = requests.Session()
         retry = Retry(
             total=5,
@@ -38,6 +57,7 @@ class PlexAPI:
         return s
 
     def _get_headers(self) -> Dict[str, str]:
+        """Headers attached to every request."""
         return {
             "X-Plex-Token": self.token,
             "Accept": "application/json",
@@ -54,9 +74,10 @@ class PlexAPI:
         sort: str = "addedAt:desc",
         filters: Optional[Dict[str, str]] = None,
     ) -> Tuple[List[dict], int]:
-        """Fetch items from a library section with pagination.
+        """Fetch items from a section with pagination.
 
-        Returns (items, total_size).
+        Returns
+        - (items, total_size)
         """
         url = f"{self.base_url}/library/sections/{section_id}/all"
         params: Dict[str, str] = {
@@ -80,11 +101,13 @@ class PlexAPI:
 
     # Backwards compatibility helpers
     def get_all_movies(self):
+        """Back-compat helper that returns the first page of movies."""
         # default first page only to avoid massive payloads
         items, _total = self.fetch_items("1", "1", start=0, size=100)
         return items
 
     def fetch_seasons(self, section_id: str):
+        """Back-compat helper to fetch first page of shows for a section."""
         # In Plex, type=2 is "show" (series). Keep prior behavior.
         items, _total = self.fetch_items(section_id, "2", start=0, size=100)
         return items
@@ -99,6 +122,15 @@ class PlexAPI:
         *,
         lock: bool = True,
     ) -> bool:
+        """Update the `addedAt` timestamp for a specific item.
+
+        Parameters
+        - section_id: Library section id
+        - item_id: The item's ratingKey
+        - type_id: Plex type id ("1" movie, "2" show)
+        - new_date_unix: Unix timestamp (seconds)
+        - lock: When True, locks the field to prevent future auto changes
+        """
         url = f"{self.base_url}/library/sections/{section_id}/all"
         params = {
             "type": str(type_id),
@@ -113,6 +145,7 @@ class PlexAPI:
 
     # --- Utilities ---
     def thumb_url(self, path: Optional[str]) -> Optional[str]:
+        """Return an absolute, tokenized image URL given a Plex thumb path."""
         if not path:
             return None
         # Some thumbs are already absolute; if so, return as-is

@@ -1,3 +1,19 @@
+<#
+.SYNOPSIS
+  Convenience wrapper for the Python CLI on Windows/Unraid PowerShell.
+
+.DESCRIPTION
+  Activates a local venv if present and invokes `src/cli.py` with the
+  provided flags. Mirrors the Python CLI arguments for consistency.
+
+.EXAMPLE
+  ./scripts/run-cli.ps1 -SectionId 1 -Type movie -Date 2024-01-15 -Year 2023 -DryRun
+
+.NOTES
+  Requires Python in PATH. Environment variables `PLEX_BASE_URL` and
+  `PLEX_TOKEN` can be provided via a `.env` file or passed explicitly.
+#>
+
 param(
   [Parameter(Mandatory=$true)][int]$SectionId,
   [ValidateSet(''movie'',''show'',''1'',''2'')] [string]$Type = ''movie'',

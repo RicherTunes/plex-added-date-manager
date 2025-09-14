@@ -16,7 +16,7 @@ Streamlit (Python) app that interacts with the Plex API to fetch and manage movi
    ```bash
    pip install -r requirements.txt
    ```
-4. **Configure your Plex credentials:** Create a `.env` file at project root
+4. **Configure your Plex credentials:** Create a `.env` file at project root (see `example.env`)
    ```ini
      PLEX_TOKEN=your_plex_token_here
      PLEX_BASE_URL=http://your-plex-ip:32400
@@ -113,6 +113,8 @@ Notes:
 - Add server-side pagination + filtering so only a small subset of items is rendered at a time.
 - Optionally add a lightweight CLI/batch mode for bulk updates without the UI.
 
-## License
+## More Docs
 
-This project is licensed under the MIT License. See the LICENSE file for more details.
+- docs/CONFIG.md — environment variables, Streamlit settings, Unraid/Windows notes
+- docs/CLI.md — flag reference, examples, exit codes
+- docs/ARCHITECTURE.md — data flow, pagination, caching, retries
