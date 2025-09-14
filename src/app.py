@@ -18,7 +18,8 @@ st.markdown(
     .title-row h3 { margin-bottom: 2px; }
     .subtle { color:#6b7280; }
     .chip { display:inline-block; background:#eef2ff; color:#3730a3; padding:2px 8px; border-radius:12px; font-size:0.75rem; margin-right:6px; }
-    .block-container { padding-top: .25rem; }
+    /* Leave room for fixed mini-pager at top */
+    .block-container { padding-top: 3.0rem; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -60,6 +61,122 @@ def _nav(prefix: str, position: str, cfg: Dict, total_pages: int, total: int, pa
         if st.button("Next >", key=f"{prefix}_{position}_next", disabled=int(cfg["page"]) >= int(total_pages)):
             st.session_state[page_state_key] = min(int(total_pages), int(cfg["page"]) + 1)
             _safe_rerun()
+
+
+def _qp_get() -> Dict[str, List[str]]:
+    try:
+        return dict(st.query_params)
+    except Exception:
+        try:
+            return st.experimental_get_query_params()  # type: ignore[attr-defined]
+        except Exception:
+            return {}
+
+
+def _qp_set(params: Dict[str, str]) -> None:
+    try:
+        st.query_params.clear()
+        for k, v in params.items():
+            st.query_params[k] = v
+    except Exception:
+        try:
+            st.experimental_set_query_params(**params)  # type: ignore[attr-defined]
+        except Exception:
+            pass
+
+
+def _handle_query_nav(prefix: str, page_state_key: str, total_pages: int) -> None:
+    q = _qp_get()
+    nav_key = f"{prefix}_nav"
+    goto_key = f"{prefix}_goto"
+    changed = False
+    if nav_key in q:
+        val = (q.get(nav_key) or [""])[0]
+        page = int(st.session_state[page_state_key])
+        if val == "prev" and page > 1:
+            st.session_state[page_state_key] = page - 1
+            changed = True
+        elif val == "next" and page < int(total_pages):
+            st.session_state[page_state_key] = page + 1
+            changed = True
+    if goto_key in q:
+        try:
+            page = int((q.get(goto_key) or [""])[0])
+            page = max(1, min(int(total_pages), page))
+            st.session_state[page_state_key] = page
+            changed = True
+        except Exception:
+            pass
+    if changed:
+        for k in [nav_key, goto_key]:
+            if k in q:
+                del q[k]
+        _qp_set({k: (v[0] if isinstance(v, list) else v) for k, v in q.items()})
+        _safe_rerun()
+
+
+def _inject_fixed_pager(prefix: str, tab_label: str, page: int, total_pages: int) -> None:
+    html = f"""
+    <style>
+      #fixed-pager-{prefix} {{
+        position: fixed; top: 0; left: 0; right: 0; height: 42px;
+        background: rgba(255,255,255,0.9); backdrop-filter: blur(4px);
+        border-bottom: 1px solid #e5e7eb; z-index: 1000;
+        display: flex; align-items: center; gap: 8px; padding: 6px 12px; font-family: ui-sans-serif, system-ui;
+      }}
+      #fixed-pager-{prefix} input {{ width: 70px; }}
+      #fixed-pager-{prefix} .spacer {{ flex: 1; }}
+      #fixed-pager-{prefix} .muted {{ color:#6b7280; font-size: 12px; }}
+      @media (max-width: 640px) {{ #fixed-pager-{prefix} {{ font-size: 12px; }} }}
+    </style>
+    <div id=\"fixed-pager-{prefix}\" style=\"display:none\">
+      <button class=\"prev\" title=\"Prev\">&lt; Prev</button>
+      <span class=\"muted\">{tab_label}</span>
+      <span>Page {page} / {total_pages}</span>
+      <span class=\"spacer\"></span>
+      <label>Go to</label>
+      <input class=\"goto\" type=\"number\" min=\"1\" max=\"{max(1,int(total_pages))}\" value=\"{page}\"/>
+      <button class=\"go\">Go</button>
+      <button class=\"next\" title=\"Next\">Next &gt;</button>
+    </div>
+    <script>
+      (function(){
+        const tabLabel = {tab_label!r};
+        const prefix = {prefix!r};
+        const root = document.getElementById('fixed-pager-'+prefix);
+        function activeTab(){
+          const t = parent.document.querySelector('button[role="tab"][aria-selected="true"]');
+          return t ? t.innerText.trim() : '';
+        }
+        function showIfActive(){ root.style.display = (activeTab()===tabLabel)?'flex':'none'; }
+        function setParam(k,v){
+          try {
+            const url = new URL(parent.location);
+            url.searchParams.set(k,v);
+            parent.location.replace(url.toString());
+          } catch(e){}
+        }
+        root.querySelector('.prev').addEventListener('click', ()=> setParam(prefix+'_nav','prev'));
+        root.querySelector('.next').addEventListener('click', ()=> setParam(prefix+'_nav','next'));
+        root.querySelector('.go').addEventListener('click', ()=> { const v = root.querySelector('.goto').value; if(v) setParam(prefix+'_goto', v); });
+        window.addEventListener('keydown', (e)=>{
+          if (activeTab()!==tabLabel) return;
+          if (e.key==='ArrowLeft') setParam(prefix+'_nav','prev');
+          if (e.key==='ArrowRight') setParam(prefix+'_nav','next');
+          if (e.key==='Enter') {
+            const el = root.querySelector('.goto');
+            if (document.activeElement === el) { const v = el.value; if(v) setParam(prefix+'_goto', v); }
+          }
+        });
+        setInterval(showIfActive, 400);
+        showIfActive();
+      })();
+    </script>
+    """
+    try:
+        components.v1.html(html, height=48)  # type: ignore[attr-defined]
+    except Exception:
+        pass
 
 
 @st.cache_data(show_spinner=False, ttl=30)
@@ -461,6 +578,8 @@ def main() -> None:
             items = [i for i in items if title_filter in (i.get("title", "").lower())]
 
         total_pages = max(1, (total + int(cfg["page_size"]) - 1) // int(cfg["page_size"]))
+        _inject_fixed_pager("movie", "Movies", int(cfg["page"]), int(total_pages))
+        _handle_query_nav("movie", "movie_page", int(total_pages))
         _nav("movie", "top", cfg, total_pages, total, "movie_page")
 
         if items:
@@ -510,6 +629,8 @@ def main() -> None:
             items = [i for i in items if title_filter in (i.get("title", "").lower())]
 
         total_pages = max(1, (total + int(cfg["page_size"]) - 1) // int(cfg["page_size"]))
+        _inject_fixed_pager("show", "TV Series", int(cfg["page"]), int(total_pages))
+        _handle_query_nav("show", "show_page", int(total_pages))
         _nav("show", "top", cfg, total_pages, total, "show_page")
 
         if items:
@@ -535,4 +656,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+
 
