@@ -19,6 +19,47 @@ st.markdown(
 )
 
 
+def _safe_rerun():
+    """Rerun compatible across Streamlit versions."""
+    try:
+        # Streamlit >= 1.27
+        if hasattr(st, "rerun"):
+            st.rerun()
+            return
+        # Legacy
+        if hasattr(st, "_safe_rerun"):
+            _safe_rerun()
+            return
+    except Exception:
+        pass
+
+
+def _nav(prefix: str, position: str, cfg: Dict, total_pages: int, total: int, page_state_key: str):
+    """Render a navigation bar with Prev/Next and Go-to-page controls."""
+    nav_l, nav_c, nav_r = st.columns([1, 2, 2])
+    with nav_l:
+        if st.button("◀ Prev", key=f"{prefix}_{position}_prev", disabled=cfg["page"] <= 1):
+            st.session_state[page_state_key] = max(1, cfg["page"] - 1)
+            _safe_rerun()
+    with nav_c:
+        st.write(f"Page {cfg['page']} of {total_pages} • Total {total}")
+    with nav_r:
+        goto = st.number_input(
+            "Go to page",
+            min_value=1,
+            max_value=max(1, int(total_pages)),
+            value=int(min(max(1, cfg["page"]), max(1, total_pages))),
+            step=1,
+            key=f"{prefix}_{position}_goto",
+        )
+        if st.button("Go", key=f"{prefix}_{position}_go"):
+            st.session_state[page_state_key] = int(goto)
+            _safe_rerun()
+        if st.button("Next ▶", key=f"{prefix}_{position}_next", disabled=cfg["page"] >= total_pages):
+            st.session_state[page_state_key] = min(total_pages, cfg["page"] + 1)
+            _safe_rerun()
+
+
 @st.cache_data(show_spinner=False, ttl=30)
 def _cached_fetch(
     base_url: str,
@@ -347,13 +388,13 @@ def main():
         with nav_l:
             if st.button("◀ Prev", key="movie_prev", disabled=cfg["page"] <= 1):
                 st.session_state["movie_page"] = max(1, cfg["page"] - 1)
-                st.experimental_rerun()
+                _safe_rerun()
         with nav_c:
             st.write(f"Page {cfg['page']} of {total_pages} • Total {total}")
         with nav_r:
             if st.button("Next ▶", key="movie_next", disabled=cfg["page"] >= total_pages):
                 st.session_state["movie_page"] = min(total_pages, cfg["page"] + 1)
-                st.experimental_rerun()
+                _safe_rerun()
 
         if items:
             _render_items(
@@ -373,6 +414,9 @@ def main():
             )
         else:
             st.info("No movies found for current filters.")
+
+        # Bottom navigation
+        _nav("movie", "bottom", cfg, total_pages, total, "movie_page")
 
     # --- TV Series (Shows) Tab ---
     with tab2:
@@ -406,13 +450,13 @@ def main():
         with nav_l:
             if st.button("◀ Prev", key="show_prev", disabled=cfg["page"] <= 1):
                 st.session_state["show_page"] = max(1, cfg["page"] - 1)
-                st.experimental_rerun()
+                _safe_rerun()
         with nav_c:
             st.write(f"Page {cfg['page']} of {total_pages} • Total {total}")
         with nav_r:
             if st.button("Next ▶", key="show_next", disabled=cfg["page"] >= total_pages):
                 st.session_state["show_page"] = min(total_pages, cfg["page"] + 1)
-                st.experimental_rerun()
+                _safe_rerun()
 
         if items:
             _render_items(
@@ -433,9 +477,17 @@ def main():
         else:
             st.info("No shows found for current filters.")
 
+        # Bottom navigation
+        _nav("show", "bottom", cfg, total_pages, total, "show_page")
+
 
 if __name__ == "__main__":
     main()
+
+
+
+
+
 
 
 
