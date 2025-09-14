@@ -32,6 +32,33 @@ Streamlit (Python) app that interacts with the Plex API to fetch and manage movi
 2. **Access the application:**
    Open your web browser and go to `http://localhost:8501`.
 
+### New Features
+
+- Pagination: Control page size (50/100/200) and navigate pages. Avoids crashes on large libraries.
+- Server-side sorting and year filter: Sort by added date, title, or year; filter by year.
+- Title contains: Client-side filter on the current page to quickly narrow items.
+- Batch updates: Select multiple items (persist selections across pages), pick a date, and update all at once with progress feedback and optional metadata lock.
+- QoL toggles: Show/hide images and enable/disable per-item edit controls to keep the UI light.
+
+Notes:
+- Movies use section id default `1`, shows use default `2`. Adjust in the UI if yours differ.
+- Batch updates send one request per item. For very large batches, consider running in smaller chunks.
+
+## Known Limitations
+
+- Large libraries (thousands of items): The app currently renders your entire library on a single page. For each item it creates an image, a date input, and an update button. Streamlit must serialize all of those widgets (and any media) and send them to the browser over a WebSocket. With several thousand items, that payload becomes very large and can exceed Streamlit’s message-size/memory limits or your browser’s memory, which is why it tends to crash around ~3k items.
+
+### Workarounds (legacy builds)
+
+- Use the new pagination + filters to keep render sizes small.
+- Reduce UI load by toggling images off when working with large pages.
+- Advanced: You can raise Streamlit’s server message size via `.streamlit/config.toml` (e.g., `maxMessageSize = 500`), but the new pagination generally makes this unnecessary.
+
+### Planned Fix
+
+- Add server-side pagination + filtering so only a small subset of items is rendered at a time.
+- Optionally add a lightweight CLI/batch mode for bulk updates without the UI.
+
 ## License
 
 This project is licensed under the MIT License. See the LICENSE file for more details.
