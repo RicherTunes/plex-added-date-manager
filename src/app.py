@@ -4,7 +4,7 @@ from typing import Dict, List, Tuple
 
 import streamlit as st
 
-from plex_api import PlexAPI
+from plex_api import PlexAPI`nfrom streamlit import components
 
 
 st.set_page_config(page_title="Plex Added Date Manager", layout="wide")
@@ -534,3 +534,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
