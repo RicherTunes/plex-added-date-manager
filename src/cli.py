@@ -16,14 +16,19 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         description="Batch update Plex addedAt dates using filters or explicit ids.",
     )
 
-    p.add_argument("--section-id", required=True, help="Plex library section id (e.g., 1 for Movies, 2 for Shows)")
+    # Discovery / utility
+    p.add_argument("--list-sections", action="store_true", help="List Plex library sections and exit")
+    p.add_argument("--sections-type", choices=["movie", "show", "artist", "photo", "mixed"], help="Filter sections by type when listing")
+
+    # Update params (validated only if not --list-sections)
+    p.add_argument("--section-id", help="Plex library section id (e.g., 1 for Movies, 2 for Shows)")
     p.add_argument(
         "--type",
         choices=["movie", "show", "1", "2"],
         default="movie",
         help="Item type: movie (1) or show (2)",
     )
-    p.add_argument("--date", required=True, help="New date in YYYY-MM-DD format")
+    p.add_argument("--date", help="New date in YYYY-MM-DD format")
     p.add_argument("--year", help="Filter by year (server-side)")
     p.add_argument("--title-contains", help="Filter current page by title substring (client-side)")
     p.add_argument("--ids", nargs="*", help="Explicit ratingKey ids to update (skip fetching)")
@@ -94,7 +99,27 @@ def main(argv: Optional[List[str]] = None) -> int:
         print("Missing PLEX_BASE_URL or PLEX_TOKEN (env or flags)", file=sys.stderr)
         return 2
 
+    if args.list_sections:
+        plex = PlexAPI(base_url=base_url, token=token)
+        try:
+            sections = plex.get_sections()
+        except Exception as e:  # noqa: BLE001
+            print(f"Failed to list sections: {e}", file=sys.stderr)
+            return 1
+        if args.sections_type:
+            sections = [s for s in sections if s.get("type") == args.sections_type]
+        if not sections:
+            print("No sections found.")
+            return 0
+        print("key\ttype\ttitle")
+        for s in sections:
+            print(f"{s['key']}\t{s.get('type','')}\t{s.get('title','')}")
+        return 0
+
     type_id = "1" if args.type in {"movie", "1"} else "2"
+    if not args.section_id or not args.date:
+        print("--section-id and --date are required for updates (omit them only with --list-sections)", file=sys.stderr)
+        return 2
     new_unix = to_unix(args.date)
     lock = not args.no_lock
 

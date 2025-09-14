@@ -57,6 +57,12 @@ python src/cli.py --section-id 1 --type movie --ids 12345 67890 --date 2021-06-0
 # Override env variables if needed
 python src/cli.py --section-id 1 --type movie --date 2024-01-15 \
   --base-url http://your-plex-ip:32400 --token YOUR_PLEX_TOKEN
+
+# List sections
+python src/cli.py --list-sections
+
+# List only TV sections
+python src/cli.py --list-sections --sections-type show
 ```
 
 Flags:
@@ -73,6 +79,10 @@ Flags:
 - `--no-lock`: Do not lock the `addedAt` field after update.
 - `--dry-run`: Show planned changes only.
 - `--base-url`, `--token`: Override `.env`.
+ 
+CLI utilities:
+- `--list-sections`: Prints `key`, `type`, and `title` for all libraries.
+- `--sections-type`: Filter list by type (e.g., `show`, `movie`).
 
 ### New Features
 

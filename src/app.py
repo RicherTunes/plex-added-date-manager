@@ -1,4 +1,5 @@
 import datetime
+import time
 from typing import Dict, List, Tuple
 
 import streamlit as st
@@ -190,6 +191,7 @@ def _render_items(
                 st.success("Cleared all selections.")
     with mid:
         batch_date = st.date_input("Batch date", value=datetime.date.today(), key=f"{key_prefix}_batch_date")
+        max_per_min = st.number_input("Max/min (0=unlimited)", min_value=0, value=0, step=30, key=f"{key_prefix}_max_per_min")
     with right:
         if st.button("Apply to selected", key=f"{key_prefix}_apply_batch"):
             keys = [k for k, v in selected.items() if v]
@@ -200,14 +202,28 @@ def _render_items(
                 total = len(keys)
                 progress = st.progress(0)
                 successes = 0
+                per_item_sleep = (60.0 / max_per_min) if max_per_min and max_per_min > 0 else 0.0
                 for idx, rating_key in enumerate(keys, start=1):
                     try:
-                        plex.update_added_date(section_id, rating_key, type_id, new_unix, lock=lock_added)
-                        successes += 1
-                    except Exception as e:  # noqa: BLE001
-                        st.error(f"Failed updating id={rating_key}: {e}")
+                        attempts = 0
+                        last_err = None
+                        while attempts < 4:
+                            try:
+                                plex.update_added_date(section_id, rating_key, type_id, new_unix, lock=lock_added)
+                                successes += 1
+                                last_err = None
+                                break
+                            except Exception as e:  # noqa: BLE001
+                                attempts += 1
+                                last_err = e
+                                backoff = min(8, 0.5 * (2 ** (attempts - 1)))
+                                time.sleep(backoff)
+                        if last_err is not None:
+                            st.error(f"Failed updating id={rating_key}: {last_err}")
                     finally:
                         progress.progress(int(idx * 100 / total))
+                        if per_item_sleep:
+                            time.sleep(per_item_sleep)
                 st.success(f"Updated {successes}/{total} items.")
 
     # Render list
