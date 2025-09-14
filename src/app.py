@@ -15,7 +15,6 @@ import streamlit as st
 from plex_api import PlexAPI
 from streamlit import components
 from string import Template
-from string import Template
 
 
 st.set_page_config(page_title="Plex Added Date Manager", layout="wide")
@@ -561,7 +560,7 @@ def main() -> None:
     with hdr_l:
         st.markdown("<h3 style='margin-bottom:0.25rem'>Plex Added Date Manager</h3>", unsafe_allow_html=True)
     with hdr_r:
-        st.selectbox("Density", ["Comfortable", "Compact"], key="ui_density")
+        st.selectbox("Density", ["Comfortable", "Compact", "Ultra Compact"], key="ui_density")
     _apply_density()
     _init_state()
 
@@ -739,6 +738,9 @@ def _inject_sticky_filters(tab_label: str, top_offset_px: int = 48) -> None:
 
 if __name__ == "__main__":
     main()
+
+
+
 
 
 
