@@ -21,9 +21,13 @@ Raising `maxMessageSize` is rarely needed since the app pages results, but can h
 
 Rate limiting and retries
 - The CLI supports `--sleep` and `--max-per-minute` to avoid overwhelming Plex.
-- The UI’s batch updater applies a per-item sleep derived from the max-per-minute value. Individual requests retry with exponential backoff.
+- The UI's batch updater applies a per-item sleep derived from the max-per-minute value. Individual requests retry with exponential backoff.
+
+UI density
+- Use the Density selector in the header to switch between `Ultra Compact`, `Compact`, `Comfortable`, and `Spacious`.
+- Density now scales the whole app: control heights, spacing, chip/title sizes, fixed pager height, and sticky filter offset. It also adapts poster sizes and list layout.
+- Choices persist per session. If you embed the UI, the parent document exposes `data-density` on `<html>` for custom components.
 
 Unraid and Windows notes
-- Unraid: Run the Python app in a container or your server’s Python. Mount a `.env` file with your token.
+- Unraid: Run the Python app in a container or your server's Python. Mount a `.env` file with your token.
 - Windows: Use PowerShell wrapper `scripts/run-cli.ps1`, or run `python src/cli.py ...` directly in a venv.
-

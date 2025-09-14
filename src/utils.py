@@ -6,7 +6,8 @@ backwards compatibility but candidates for cleanup.
 
 from __future__ import annotations
 
-from datetime import date as Date, datetime
+from datetime import date as Date
+from datetime import datetime
 from typing import Any, Dict, Optional
 
 
@@ -20,6 +21,7 @@ def format_date(date_string: str) -> Optional[Date]:
     except ValueError:
         return None
 
+
 def validate_date(value: Any) -> bool:
     """Return True when the value is a `datetime` instance.
 
@@ -28,6 +30,7 @@ def validate_date(value: Any) -> bool:
     """
     return isinstance(value, datetime)
 
+
 def format_movie_data(movie: Any) -> Dict[str, Any]:
     """Serialize a movie-like object into a simple dict for display.
 
@@ -35,7 +38,9 @@ def format_movie_data(movie: Any) -> Dict[str, Any]:
     """
     return {
         "title": getattr(movie, "title", None),
-        "added_date": getattr(getattr(movie, "addedAt", None), "strftime", lambda _fmt: None)("%Y-%m-%d"),
+        "added_date": getattr(getattr(movie, "addedAt", None), "strftime", lambda _fmt: None)(
+            "%Y-%m-%d"
+        ),
         "rating": getattr(movie, "rating", None),
         "summary": getattr(movie, "summary", None),
     }

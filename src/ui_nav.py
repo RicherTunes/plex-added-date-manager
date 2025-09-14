@@ -9,11 +9,11 @@ Contains:
 - `_inject_sticky_filters`: keeps filter row sticky below the header
 """
 
-from typing import Dict, List
+from string import Template
+from typing import Dict, List, Optional
 
 import streamlit as st
 from streamlit import components
-from string import Template
 
 
 def _safe_rerun() -> None:
@@ -28,7 +28,9 @@ def _safe_rerun() -> None:
         pass
 
 
-def _nav(prefix: str, position: str, cfg: Dict, total_pages: int, total: int, page_state_key: str) -> None:
+def _nav(
+    prefix: str, position: str, cfg: Dict, total_pages: int, total: int, page_state_key: str
+) -> None:
     nav_l, nav_c, nav_r = st.columns([1, 2, 2])
     with nav_l:
         if st.button("< Prev", key=f"{prefix}_{position}_prev", disabled=cfg["page"] <= 1):
@@ -48,7 +50,9 @@ def _nav(prefix: str, position: str, cfg: Dict, total_pages: int, total: int, pa
         if st.button("Go", key=f"{prefix}_{position}_go"):
             st.session_state[page_state_key] = int(goto)
             _safe_rerun()
-        if st.button("Next >", key=f"{prefix}_{position}_next", disabled=int(cfg["page"]) >= int(total_pages)):
+        if st.button(
+            "Next >", key=f"{prefix}_{position}_next", disabled=int(cfg["page"]) >= int(total_pages)
+        ):
             st.session_state[page_state_key] = min(int(total_pages), int(cfg["page"]) + 1)
             _safe_rerun()
 
@@ -106,19 +110,32 @@ def _handle_query_nav(prefix: str, page_state_key: str, total_pages: int) -> Non
 
 
 def _inject_fixed_pager(prefix: str, tab_label: str, page: int, total_pages: int) -> None:
+    # Read density to size the fixed bar consistently with the app header
+    try:
+        density = st.session_state.get("ui_density", "Comfortable")
+    except Exception:
+        density = "Comfortable"
+    nav_h = {"Ultra Compact": 40, "Compact": 44, "Comfortable": 48, "Spacious": 56}.get(density, 48)
+    font_px = {"Ultra Compact": 12, "Compact": 12, "Comfortable": 13, "Spacious": 14}.get(
+        density, 13
+    )
+    muted_px = max(font_px - 1, 11)
+    font_small_px = max(font_px - 1, 11)
+    pad_v = {"Ultra Compact": 4, "Compact": 6, "Comfortable": 6, "Spacious": 8}.get(density, 6)
+
     tpl = Template(
         """
         <style>
           #fixed-pager-$prefix {
-            position: fixed; top: 0; left: 0; right: 0; height: 42px;
+            position: fixed; top: 0; left: 0; right: 0; height: ${nav_h}px;
             background: rgba(255,255,255,0.9); backdrop-filter: blur(4px);
             border-bottom: 1px solid #e5e7eb; z-index: 1000;
-            display: flex; align-items: center; gap: 8px; padding: 6px 12px; font-family: ui-sans-serif, system-ui;
+            display: flex; align-items: center; gap: 8px; padding: ${pad_v}px 12px; font-family: ui-sans-serif, system-ui; font-size: ${font_px}px;
           }
           #fixed-pager-$prefix input { width: 70px; }
           #fixed-pager-$prefix .spacer { flex: 1; }
-          #fixed-pager-$prefix .muted { color:#6b7280; font-size: 12px; }
-          @media (max-width: 640px) { #fixed-pager-$prefix { font-size: 12px; } }
+          #fixed-pager-$prefix .muted { color:#6b7280; font-size: ${muted_px}px; }
+          @media (max-width: 640px) { #fixed-pager-$prefix { font-size: ${font_small}px; } }
         </style>
         <div id="fixed-pager-$prefix" style="display:none">
           <button class="prev" title="Prev">&lt; Prev</button>
@@ -166,15 +183,33 @@ def _inject_fixed_pager(prefix: str, tab_label: str, page: int, total_pages: int
         """
     )
     html = tpl.safe_substitute(
-        prefix=str(prefix), tab=str(tab_label), page=str(page), total=str(total_pages), max=str(max(1, int(total_pages)))
+        prefix=str(prefix),
+        tab=str(tab_label),
+        page=str(page),
+        total=str(total_pages),
+        max=str(max(1, int(total_pages))),
+        nav_h=str(nav_h),
+        pad_v=str(pad_v),
+        font_px=str(font_px),
+        muted_px=str(muted_px),
+        font_small=str(font_small_px),
     )
     try:
-        components.v1.html(html, height=48)  # type: ignore[attr-defined]
+        components.v1.html(html, height=nav_h)  # type: ignore[attr-defined]
     except Exception:
         pass
 
 
-def _inject_sticky_filters(tab_label: str, top_offset_px: int = 48) -> None:
+def _inject_sticky_filters(tab_label: str, top_offset_px: Optional[int] = None) -> None:
+    # Compute top offset from current density if not provided
+    if top_offset_px is None:
+        try:
+            density = st.session_state.get("ui_density", "Comfortable")
+        except Exception:
+            density = "Comfortable"
+        top_offset_px = {"Ultra Compact": 40, "Compact": 44, "Comfortable": 48, "Spacious": 56}.get(
+            density, 48
+        )
     tpl = Template(
         """
         <script>
@@ -225,4 +260,3 @@ def _inject_sticky_filters(tab_label: str, top_offset_px: int = 48) -> None:
         components.v1.html(html, height=0)  # type: ignore[attr-defined]
     except Exception:
         pass
-

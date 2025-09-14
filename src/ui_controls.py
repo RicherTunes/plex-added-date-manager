@@ -32,29 +32,87 @@ def _init_state() -> None:
 
 
 def _apply_density() -> None:
+    """Apply global, density-aware CSS tokens for the whole UI.
+
+    Scales spacing, control sizes, typography, and chrome consistently.
+    Keeps legacy values working for "Ultra Compact".
+    """
     density = st.session_state.get("ui_density", "Comfortable")
-    if density == "Compact":
-        st.markdown(
-            """
-            <style>
-            /* Text sizes */
-            .title-row h3 { font-size: 1.0rem; }
-            .meta { font-size: 0.82rem; }
-            .chip { font-size: 0.70rem; padding: 1px 6px; }
-            /* Widget sizes */
-            .stButton button { padding: 4px 8px; font-size: 0.85rem; }
-            div[data-baseweb="select"] > div { min-height: 32px; }
-            .stSelectbox label, .stTextInput label, .stDateInput label, .stNumberInput label { font-size: 0.85rem; margin-bottom: 0.15rem; }
-            .stTextInput input, .stNumberInput input, .stDateInput input { height: 32px; font-size: 0.9rem; }
-            .stCheckbox label { font-size: 0.9rem; }
-            /* Images */
-            div[data-testid="stImage"] img { width: 80px !important; }
-            /* Slightly tighter container */
-            .block-container { padding-top: 2.6rem; }
-            </style>
-            """,
-            unsafe_allow_html=True,
-        )
+
+    # Map density -> scale/tokens
+    # Ultra Compact kept as smallest scale for backward-compat
+    if density not in {"Ultra Compact", "Compact", "Comfortable", "Spacious"}:
+        density = "Comfortable"
+
+    tokens = {
+        "Ultra Compact": {"scale": 0.8, "control_h": 28, "nav_h": 40, "icon": 14, "radius": 6},
+        "Compact": {"scale": 0.9, "control_h": 32, "nav_h": 44, "icon": 16, "radius": 7},
+        "Comfortable": {"scale": 1.0, "control_h": 36, "nav_h": 48, "icon": 16, "radius": 8},
+        "Spacious": {"scale": 1.15, "control_h": 44, "nav_h": 56, "icon": 18, "radius": 10},
+    }[density]
+
+    scale = tokens["scale"]
+    control_h = tokens["control_h"]
+    nav_h = tokens["nav_h"]
+    icon = tokens["icon"]
+    radius = tokens["radius"]
+
+    # Derived spacing steps (4px baseline)
+    s1 = int(round(4 * scale))
+    s2 = int(round(8 * scale))
+    s3 = int(round(12 * scale))
+    s4 = int(round(16 * scale))
+
+    # Typography
+    t100 = max(12, int(round(12 * scale)))
+    t200 = max(13, int(round(14 * scale)))
+
+    css = f"""
+    <style>
+      :root {{
+        --density: '{density}';
+        --scale: {scale};
+        --space-1: {s1}px;
+        --space-2: {s2}px;
+        --space-3: {s3}px;
+        --space-4: {s4}px;
+        --radius: {radius}px;
+        --control-h: {control_h}px;
+        --icon: {icon}px;
+        --nav-h: {nav_h}px;
+        --type-100: {t100}px;
+        --type-200: {t200}px;
+      }}
+
+      /* App chrome */
+      .block-container {{ padding-top: calc(var(--nav-h) + var(--space-2)); }}
+      [data-testid="stHeader"] {{ height: var(--nav-h) !important; }}
+
+      /* Titles & chips */
+      .title-row h3 {{ margin-bottom: 2px; font-size: calc(var(--type-200)); }}
+      .meta {{ color:#6b7280; font-size: calc(var(--type-100) * 0.95); margin: 4px 0 0; }}
+      .chip {{ display:inline-block; background:#eef2ff; color:#3730a3; padding:2px var(--space-2); border-radius:12px; font-size: calc(var(--type-100) * 0.9); margin-right: var(--space-2); }}
+
+      /* Controls */
+      .stButton button {{ height: var(--control-h); padding: 0 var(--space-3); font-size: calc(var(--type-200)); border-radius: var(--radius); }}
+      div[data-baseweb="select"] > div {{ min-height: var(--control-h); }}
+      .stSelectbox label, .stTextInput label, .stDateInput label, .stNumberInput label {{ font-size: calc(var(--type-100)); margin-bottom: 0.2rem; }}
+      .stTextInput input, .stNumberInput input, .stDateInput input {{ height: var(--control-h); font-size: calc(var(--type-200)); }}
+      .stCheckbox label {{ font-size: calc(var(--type-200)); }}
+
+      /* Layout spacing nudges */
+      div[data-testid="stHorizontalBlock"] > div {{ padding-right: var(--space-2); }}
+      div[data-testid="stVerticalBlock"] > div {{ margin-bottom: var(--space-3); }}
+
+      /* Images within Streamlit image blocks will be sized by renderer */
+    </style>
+    <script>
+      // Expose density on the parent document for custom components
+      try {{ parent.document.documentElement.dataset.density = '{density}'.toLowerCase().replace(' ', '-'); }} catch(e) {{}}
+    </script>
+    """
+
+    st.markdown(css, unsafe_allow_html=True)
 
 
 def _controls(prefix: str, *, sections: List[dict], required_type: str) -> Dict:
@@ -81,7 +139,9 @@ def _controls(prefix: str, *, sections: List[dict], required_type: str) -> Dict:
                 idx = labels.index(next(l for l in labels if label_to_key[l] == curr))
             except Exception:
                 idx = 0
-            chosen = st.selectbox("Section", options=labels, index=idx, key=f"{prefix}_section_label")
+            chosen = st.selectbox(
+                "Section", options=labels, index=idx, key=f"{prefix}_section_label"
+            )
             st.session_state[section_key] = label_to_key[chosen]
         else:
             st.text_input("Section ID", key=section_key)
@@ -90,7 +150,14 @@ def _controls(prefix: str, *, sections: List[dict], required_type: str) -> Dict:
     with r1c3:
         st.selectbox(
             "Sort",
-            ["addedAt:desc", "addedAt:asc", "titleSort:asc", "titleSort:desc", "year:desc", "year:asc"],
+            [
+                "addedAt:desc",
+                "addedAt:asc",
+                "titleSort:asc",
+                "titleSort:desc",
+                "year:desc",
+                "year:asc",
+            ],
             key=sort_key,
         )
     with r1c4:
@@ -122,4 +189,3 @@ def _controls(prefix: str, *, sections: List[dict], required_type: str) -> Dict:
         "show_images": st.session_state[images_key],
         "lock": st.session_state[lock_key],
     }
-

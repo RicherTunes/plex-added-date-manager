@@ -25,8 +25,19 @@ def _render_items(
     page_size: int,
 ) -> None:
     density = st.session_state.get("ui_density", "Comfortable")
-    cols_widths = [0.16, 0.84] if density == "Compact" else [0.2, 0.8]
-    poster_w = 80 if density == "Compact" else 110
+    # Column width and poster size by density
+    if density == "Ultra Compact":
+        cols_widths = [0.16, 0.84]
+        poster_w = 80
+    elif density == "Compact":
+        cols_widths = [0.18, 0.82]
+        poster_w = 90
+    elif density == "Spacious":
+        cols_widths = [0.24, 0.76]
+        poster_w = 130
+    else:  # Comfortable (default)
+        cols_widths = [0.2, 0.8]
+        poster_w = 110
     selected: Dict[str, bool] = st.session_state.setdefault(select_key, {})
 
     # Batch controls
@@ -52,7 +63,11 @@ def _render_items(
                         )
                         total_known = total
                         if title_filter:
-                            batch_items = [i for i in batch_items if title_filter in (i.get("title", "").lower())]
+                            batch_items = [
+                                i
+                                for i in batch_items
+                                if title_filter in (i.get("title", "").lower())
+                            ]
                         for it in batch_items:
                             rk = str(it.get("ratingKey"))
                             if rk:
@@ -64,7 +79,9 @@ def _render_items(
                         progress.progress(min(100, int(start * 100 / max(1, total))))
                 finally:
                     progress.progress(100)
-                st.success(f"Selected {selected_count} items across results (total ~{total_known}).")
+                st.success(
+                    f"Selected {selected_count} items across results (total ~{total_known})."
+                )
         with b2:
             if st.button("Clear all", key=f"{key_prefix}_clear_all"):
                 selected.clear()
@@ -77,8 +94,12 @@ def _render_items(
                         selected[rk] = False
                 st.success("Cleared selections on this page.")
     with mid:
-        batch_date = st.date_input("Batch date", value=datetime.date.today(), key=f"{key_prefix}_batch_date")
-        max_per_min = st.number_input("Max/min (0=unlimited)", min_value=0, value=0, step=30, key=f"{key_prefix}_max_per_min")
+        batch_date = st.date_input(
+            "Batch date", value=datetime.date.today(), key=f"{key_prefix}_batch_date"
+        )
+        max_per_min = st.number_input(
+            "Max/min (0=unlimited)", min_value=0, value=0, step=30, key=f"{key_prefix}_max_per_min"
+        )
     with right:
         if st.button("Apply to selected", key=f"{key_prefix}_apply_batch"):
             keys = [k for k, v in selected.items() if v]
@@ -95,7 +116,9 @@ def _render_items(
                     attempts = 0
                     while attempts < 4:
                         try:
-                            plex.update_added_date(section_id, rating_key, type_id, new_unix, lock=lock_added)
+                            plex.update_added_date(
+                                section_id, rating_key, type_id, new_unix, lock=lock_added
+                            )
                             successes += 1
                             last_err = None
                             break
@@ -116,7 +139,7 @@ def _render_items(
 
     # Date range selection (advanced)
     with st.expander("Select by Added date range", expanded=False):
-        presets = st.columns([1,1,1,1,1,1,1])
+        presets = st.columns([1, 1, 1, 1, 1, 1, 1])
         today = datetime.date.today()
         # Preset handlers
         preset_actions = {
@@ -135,7 +158,9 @@ def _render_items(
                     st.session_state[f"{key_prefix}_range_to"] = end
         with presets[-2]:
             if st.button("Older >1y", key=f"{key_prefix}_preset_older"):
-                st.session_state[f"{key_prefix}_range_from"] = today - datetime.timedelta(days=365*50)
+                st.session_state[f"{key_prefix}_range_from"] = today - datetime.timedelta(
+                    days=365 * 50
+                )
                 st.session_state[f"{key_prefix}_range_to"] = today - datetime.timedelta(days=365)
         with presets[-1]:
             if st.button("Clear", key=f"{key_prefix}_preset_clear"):
@@ -144,9 +169,19 @@ def _render_items(
 
         rc1, rc2 = st.columns(2)
         with rc1:
-            range_from = st.date_input("From", key=f"{key_prefix}_range_from", value=st.session_state.get(f"{key_prefix}_range_from", today - datetime.timedelta(days=365)))
+            range_from = st.date_input(
+                "From",
+                key=f"{key_prefix}_range_from",
+                value=st.session_state.get(
+                    f"{key_prefix}_range_from", today - datetime.timedelta(days=365)
+                ),
+            )
         with rc2:
-            range_to = st.date_input("To", key=f"{key_prefix}_range_to", value=st.session_state.get(f"{key_prefix}_range_to", today))
+            range_to = st.date_input(
+                "To",
+                key=f"{key_prefix}_range_to",
+                value=st.session_state.get(f"{key_prefix}_range_to", today),
+            )
         act1, act2 = st.columns(2)
 
         def _select_range(select: bool):
@@ -166,7 +201,9 @@ def _render_items(
                         filters=({"year": year} if year else None),
                     )
                     if title_filter:
-                        batch_items = [i for i in batch_items if title_filter in (i.get("title", "").lower())]
+                        batch_items = [
+                            i for i in batch_items if title_filter in (i.get("title", "").lower())
+                        ]
                     for it in batch_items:
                         at = int(it.get("addedAt", 0) or 0)
                         if start_ts <= at <= end_ts:
@@ -181,6 +218,7 @@ def _render_items(
             finally:
                 progress.progress(100)
             st.success(("Selected" if select else "Deselected") + f" {touched} items in range.")
+
         with act1:
             if st.button("Select range", key=f"{key_prefix}_select_range"):
                 _select_range(True)
@@ -222,7 +260,11 @@ def _render_items(
                     d = st.session_state[date_key]
                     new_unix = int(datetime.datetime.combine(d, datetime.time.min).timestamp())
                     plex.update_added_date(section_id, rk, type_id, new_unix, lock=lock_added)
-                    st.toast(f"Saved {title}") if hasattr(st, "toast") else st.success(f"Saved {title}")
+                    (
+                        st.toast(f"Saved {title}")
+                        if hasattr(st, "toast")
+                        else st.success(f"Saved {title}")
+                    )
                 except Exception as e:  # noqa: BLE001
                     st.error(f"Failed to save {title}: {e}")
 
@@ -232,5 +274,7 @@ def _render_items(
             st.date_input("Added", key=date_key, on_change=_on_change_inline, **date_kwargs)
 
             # Secondary info chips
-            st.markdown(f"<span class='chip'>Release {rel}</span> <span class='chip'>ID {rating_key}</span>", unsafe_allow_html=True)
-
+            st.markdown(
+                f"<span class='chip'>Release {rel}</span> <span class='chip'>ID {rating_key}</span>",
+                unsafe_allow_html=True,
+            )

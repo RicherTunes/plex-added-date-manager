@@ -6,18 +6,18 @@ Highlights
 - Selection persists with batch updates and rate limiting
 - URL query params for pager navigation
 """
+
 import datetime
 import time
 from typing import Dict, List, Tuple
 
 import streamlit as st
 
-from plex_api import PlexAPI
-import ui_nav as nav
 import ui_controls as controls
+import ui_nav as nav
 from data_cache import _cached_fetch as cached_fetch
+from plex_api import PlexAPI
 from ui_render import _render_items as render_items
-
 
 st.set_page_config(page_title="Plex Added Date Manager", layout="wide")
 
@@ -49,7 +49,9 @@ def _safe_rerun() -> None:
         pass
 
 
-def _nav(prefix: str, position: str, cfg: Dict, total_pages: int, total: int, page_state_key: str) -> None:
+def _nav(
+    prefix: str, position: str, cfg: Dict, total_pages: int, total: int, page_state_key: str
+) -> None:
     nav_l, nav_c, nav_r = st.columns([1, 2, 2])
     with nav_l:
         if st.button("< Prev", key=f"{prefix}_{position}_prev", disabled=cfg["page"] <= 1):
@@ -69,7 +71,9 @@ def _nav(prefix: str, position: str, cfg: Dict, total_pages: int, total: int, pa
         if st.button("Go", key=f"{prefix}_{position}_go"):
             st.session_state[page_state_key] = int(goto)
             _safe_rerun()
-        if st.button("Next >", key=f"{prefix}_{position}_next", disabled=int(cfg["page"]) >= int(total_pages)):
+        if st.button(
+            "Next >", key=f"{prefix}_{position}_next", disabled=int(cfg["page"]) >= int(total_pages)
+        ):
             st.session_state[page_state_key] = min(int(total_pages), int(cfg["page"]) + 1)
             _safe_rerun()
 
@@ -187,7 +191,11 @@ def _inject_fixed_pager(prefix: str, tab_label: str, page: int, total_pages: int
         """
     )
     html = tpl.safe_substitute(
-        prefix=str(prefix), tab=str(tab_label), page=str(page), total=str(total_pages), max=str(max(1, int(total_pages)))
+        prefix=str(prefix),
+        tab=str(tab_label),
+        page=str(page),
+        total=str(total_pages),
+        max=str(max(1, int(total_pages))),
     )
     try:
         components.v1.html(html, height=48)  # type: ignore[attr-defined]
@@ -287,7 +295,9 @@ def _controls(prefix: str, *, sections: List[dict], required_type: str) -> Dict:
                 idx = labels.index(next(l for l in labels if label_to_key[l] == curr))
             except Exception:
                 idx = 0
-            chosen = st.selectbox("Section", options=labels, index=idx, key=f"{prefix}_section_label")
+            chosen = st.selectbox(
+                "Section", options=labels, index=idx, key=f"{prefix}_section_label"
+            )
             st.session_state[section_key] = label_to_key[chosen]
         else:
             st.text_input("Section ID", key=section_key)
@@ -296,7 +306,14 @@ def _controls(prefix: str, *, sections: List[dict], required_type: str) -> Dict:
     with r1c3:
         st.selectbox(
             "Sort",
-            ["addedAt:desc", "addedAt:asc", "titleSort:asc", "titleSort:desc", "year:desc", "year:asc"],
+            [
+                "addedAt:desc",
+                "addedAt:asc",
+                "titleSort:asc",
+                "titleSort:desc",
+                "year:desc",
+                "year:asc",
+            ],
             key=sort_key,
         )
     with r1c4:
@@ -373,7 +390,11 @@ def _render_items(
                         )
                         total_known = total
                         if title_filter:
-                            batch_items = [i for i in batch_items if title_filter in (i.get("title", "").lower())]
+                            batch_items = [
+                                i
+                                for i in batch_items
+                                if title_filter in (i.get("title", "").lower())
+                            ]
                         for it in batch_items:
                             rk = str(it.get("ratingKey"))
                             if rk:
@@ -385,7 +406,9 @@ def _render_items(
                         progress.progress(min(100, int(start * 100 / max(1, total))))
                 finally:
                     progress.progress(100)
-                st.success(f"Selected {selected_count} items across results (total ~{total_known}).")
+                st.success(
+                    f"Selected {selected_count} items across results (total ~{total_known})."
+                )
         with b2:
             if st.button("Clear all", key=f"{key_prefix}_clear_all"):
                 selected.clear()
@@ -398,8 +421,12 @@ def _render_items(
                         selected[rk] = False
                 st.success("Cleared selections on this page.")
     with mid:
-        batch_date = st.date_input("Batch date", value=datetime.date.today(), key=f"{key_prefix}_batch_date")
-        max_per_min = st.number_input("Max/min (0=unlimited)", min_value=0, value=0, step=30, key=f"{key_prefix}_max_per_min")
+        batch_date = st.date_input(
+            "Batch date", value=datetime.date.today(), key=f"{key_prefix}_batch_date"
+        )
+        max_per_min = st.number_input(
+            "Max/min (0=unlimited)", min_value=0, value=0, step=30, key=f"{key_prefix}_max_per_min"
+        )
     with right:
         if st.button("Apply to selected", key=f"{key_prefix}_apply_batch"):
             keys = [k for k, v in selected.items() if v]
@@ -416,14 +443,16 @@ def _render_items(
                     attempts = 0
                     while attempts < 4:
                         try:
-                            plex.update_added_date(section_id, rating_key, type_id, new_unix, lock=lock_added)
+                            plex.update_added_date(
+                                section_id, rating_key, type_id, new_unix, lock=lock_added
+                            )
                             successes += 1
                             last_err = None
                             break
                         except Exception as e:  # noqa: BLE001
                             attempts += 1
                             last_err = e
-                            time.sleep(min(8, 0.5 * (2  (attempts - 1))))
+                            time.sleep(min(8, 0.5 * (2 ** (attempts - 1))))
                     if last_err is not None:
                         st.error(f"Failed updating id={rating_key}: {last_err}")
                     progress.progress(int(idx * 100 / total_sel))
@@ -437,7 +466,7 @@ def _render_items(
 
     # Date range selection (advanced)
     with st.expander("Select by Added date range", expanded=False):
-        presets = st.columns([1,1,1,1,1,1,1])
+        presets = st.columns([1, 1, 1, 1, 1, 1, 1])
         today = datetime.date.today()
         # Preset handlers
         preset_actions = {
@@ -446,7 +475,6 @@ def _render_items(
             "Last 90": (today - datetime.timedelta(days=90), today),
             "Last 365": (today - datetime.timedelta(days=365), today),
             "This Year": (datetime.date(today.year, 1, 1), today),
-            
         }
         keys = list(preset_actions.keys())
         for i, name in enumerate(keys):
@@ -457,7 +485,9 @@ def _render_items(
                     st.session_state[f"{key_prefix}_range_to"] = end
         with presets[-2]:
             if st.button("Older >1y", key=f"{key_prefix}_preset_older"):
-                st.session_state[f"{key_prefix}_range_from"] = today - datetime.timedelta(days=365*50)
+                st.session_state[f"{key_prefix}_range_from"] = today - datetime.timedelta(
+                    days=365 * 50
+                )
                 st.session_state[f"{key_prefix}_range_to"] = today - datetime.timedelta(days=365)
         with presets[-1]:
             if st.button("Clear", key=f"{key_prefix}_preset_clear"):
@@ -466,10 +496,21 @@ def _render_items(
 
         rc1, rc2 = st.columns(2)
         with rc1:
-            range_from = st.date_input("From", key=f"{key_prefix}_range_from", value=st.session_state.get(f"{key_prefix}_range_from", today - datetime.timedelta(days=365)))
+            range_from = st.date_input(
+                "From",
+                key=f"{key_prefix}_range_from",
+                value=st.session_state.get(
+                    f"{key_prefix}_range_from", today - datetime.timedelta(days=365)
+                ),
+            )
         with rc2:
-            range_to = st.date_input("To", key=f"{key_prefix}_range_to", value=st.session_state.get(f"{key_prefix}_range_to", today))
+            range_to = st.date_input(
+                "To",
+                key=f"{key_prefix}_range_to",
+                value=st.session_state.get(f"{key_prefix}_range_to", today),
+            )
         act1, act2 = st.columns(2)
+
         def _select_range(select: bool):
             start_ts = int(datetime.datetime.combine(range_from, datetime.time.min).timestamp())
             end_ts = int(datetime.datetime.combine(range_to, datetime.time.max).timestamp())
@@ -487,7 +528,9 @@ def _render_items(
                         filters=({"year": year} if year else None),
                     )
                     if title_filter:
-                        batch_items = [i for i in batch_items if title_filter in (i.get("title", "").lower())]
+                        batch_items = [
+                            i for i in batch_items if title_filter in (i.get("title", "").lower())
+                        ]
                     for it in batch_items:
                         at = int(it.get("addedAt", 0) or 0)
                         if start_ts <= at <= end_ts:
@@ -502,6 +545,7 @@ def _render_items(
             finally:
                 progress.progress(100)
             st.success(("Selected" if select else "Deselected") + f" {touched} items in range.")
+
         with act1:
             if st.button("Select range", key=f"{key_prefix}_select_range"):
                 _select_range(True)
@@ -543,33 +587,35 @@ def _render_items(
                     d = st.session_state[date_key]
                     new_unix = int(datetime.datetime.combine(d, datetime.time.min).timestamp())
                     plex.update_added_date(section_id, rk, type_id, new_unix, lock=lock_added)
-                    st.toast(f"Saved {title}") if hasattr(st, "toast") else st.success(f"Saved {title}")
+                    (
+                        st.toast(f"Saved {title}")
+                        if hasattr(st, "toast")
+                        else st.success(f"Saved {title}")
+                    )
                 except Exception as e:  # noqa: BLE001
                     st.error(f"Failed to save {title}: {e}")
 
             date_kwargs = {}
-            label_vis = "collapsed" if density == "Ultra Compact" else "visible"
-            try:
-                st.date_input("Added", key=date_key, on_change=_on_change_inline, label_visibility=label_vis, **date_kwargs)
-            except TypeError:
-                if density == "Ultra Compact":
-                    st.date_input("", key=date_key, on_change=_on_change_inline, date_kwargs)
-                else:
-                    st.date_input("Added", key=date_key, on_change=_on_change_inline, date_kwargs)
-                else:
-                    st.date_input("Added", key=date_key, on_change=_on_change_inline, date_kwargs)
+            st.date_input("Added", key=date_key, on_change=_on_change_inline, **date_kwargs)
 
             # Secondary info chips
-            st.markdown(f"<span class='chip'>Release {rel}</span> <span class='chip'>ID {rating_key}</span>", unsafe_allow_html=True)
+            st.markdown(
+                f"<span class='chip'>Release {rel}</span> <span class='chip'>ID {rating_key}</span>",
+                unsafe_allow_html=True,
+            )
 
 
 def main() -> None:
     # Header row with density selector
     hdr_l, hdr_r = st.columns([3, 1])
     with hdr_l:
-        st.markdown("<h3 style='margin-bottom:0.25rem'>Plex Added Date Manager</h3>", unsafe_allow_html=True)
+        st.markdown(
+            "<h3 style='margin-bottom:0.25rem'>Plex Added Date Manager</h3>", unsafe_allow_html=True
+        )
     with hdr_r:
-        st.selectbox("Density", ["Comfortable", "Compact", "Ultra Compact"], key="ui_density")
+        st.selectbox(
+            "Density", ["Comfortable", "Compact", "Ultra Compact", "Spacious"], key="ui_density"
+        )
     controls._apply_density()
     controls._init_state()
 
@@ -589,7 +635,7 @@ def main() -> None:
     # Movies
     with tab1:
         cfg = controls._controls("movie", sections=sections, required_type="1")
-        nav._inject_sticky_filters("Movies", top_offset_px=48)
+        nav._inject_sticky_filters("Movies")
         section_id = cfg["section_id"] or "1"
         type_id = "1"
 
@@ -642,7 +688,7 @@ def main() -> None:
     # Shows
     with tab2:
         cfg = controls._controls("show", sections=sections, required_type="2")
-        nav._inject_sticky_filters("TV Series", top_offset_px=48)
+        nav._inject_sticky_filters("TV Series")
         section_id = cfg["section_id"] or "2"
         type_id = "2"
 
@@ -747,32 +793,3 @@ def _inject_sticky_filters(tab_label: str, top_offset_px: int = 48) -> None:
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

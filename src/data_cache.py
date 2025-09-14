@@ -21,4 +21,3 @@ def _cached_fetch(
     p = PlexAPI(base_url=base_url, token=token)
     filters = {"year": year} if year else None
     return p.fetch_items(section_id, type_id, start=start, size=size, sort=sort, filters=filters)
-

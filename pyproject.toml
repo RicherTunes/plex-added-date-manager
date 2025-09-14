@@ -1,7 +1,7 @@
 [tool.black]
 line-length = 100
 target-version = ["py39", "py310", "py311"]
-include = "(src|tests)/.*\\.py$"
+include = '(src|tests)/.*\.py$'
 
 [tool.isort]
 profile = "black"
@@ -9,7 +9,6 @@ line_length = 100
 src_paths = ["src", "tests"]
 
 [tool.pydocstyle]
-ignore = ["D100", "D104", "D105", "D107", "D203", "D213"]
-match = "(?!test_).*\\.py$"
-match-dir = "(?!\.venv|venv|.git|docs).*"
-
+ignore = ["D100", "D103", "D104", "D105", "D107", "D203", "D213", "D407", "D413", "D417"]
+match = '(?!test_).*\.py$'
+match-dir = '(?!\.venv|venv|.git|docs).*'

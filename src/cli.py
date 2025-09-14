@@ -40,8 +40,14 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     )
 
     # Discovery / utility
-    p.add_argument("--list-sections", action="store_true", help="List Plex library sections and exit")
-    p.add_argument("--sections-type", choices=["movie", "show", "artist", "photo", "mixed"], help="Filter sections by type when listing")
+    p.add_argument(
+        "--list-sections", action="store_true", help="List Plex library sections and exit"
+    )
+    p.add_argument(
+        "--sections-type",
+        choices=["movie", "show", "artist", "photo", "mixed"],
+        help="Filter sections by type when listing",
+    )
 
     # Update params (validated only if not --list-sections)
     p.add_argument("--section-id", help="Plex library section id (e.g., 1 for Movies, 2 for Shows)")
@@ -57,9 +63,13 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     p.add_argument("--ids", nargs="*", help="Explicit ratingKey ids to update (skip fetching)")
     p.add_argument("--page-size", type=int, default=200, help="Fetch page size (default 200)")
     p.add_argument("--max-items", type=int, help="Stop after updating N matched items")
-    p.add_argument("--sleep", type=float, default=0.0, help="Sleep seconds between updates (throttle)")
+    p.add_argument(
+        "--sleep", type=float, default=0.0, help="Sleep seconds between updates (throttle)"
+    )
     p.add_argument("--max-per-minute", type=float, help="Max updates per minute (rate limit)")
-    p.add_argument("--no-lock", action="store_true", help="Do not lock the addedAt field after update")
+    p.add_argument(
+        "--no-lock", action="store_true", help="Do not lock the addedAt field after update"
+    )
     p.add_argument("--base-url", help="Override PLEX_BASE_URL")
     p.add_argument("--token", help="Override PLEX_TOKEN")
     p.add_argument("--dry-run", action="store_true", help="Print planned changes without applying")
@@ -151,7 +161,10 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     type_id = "1" if args.type in {"movie", "1"} else "2"
     if not args.section_id or not args.date:
-        print("--section-id and --date are required for updates (omit them only with --list-sections)", file=sys.stderr)
+        print(
+            "--section-id and --date are required for updates (omit them only with --list-sections)",
+            file=sys.stderr,
+        )
         return 2
     new_unix = to_unix(args.date)
     lock = not args.no_lock

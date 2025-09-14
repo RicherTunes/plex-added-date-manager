@@ -11,10 +11,10 @@ import os
 from typing import Dict, List, Optional, Tuple
 
 import requests
+from dotenv import load_dotenv
 from requests import Session
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-from dotenv import load_dotenv
 
 load_dotenv()
 
@@ -26,6 +26,7 @@ class PlexAPI:
     - base_url: Base server URL (e.g., http://host:32400). Falls back to env var `PLEX_BASE_URL`.
     - token: Plex token. Falls back to env var `PLEX_TOKEN`.
     """
+
     def __init__(self, base_url: Optional[str] = None, token: Optional[str] = None):
         if base_url is None:
             base_url = os.environ.get("PLEX_BASE_URL")
@@ -166,9 +167,11 @@ class PlexAPI:
         # Normalize fields
         out: List[dict] = []
         for d in dirs:
-            out.append({
-                "key": str(d.get("key")),
-                "title": d.get("title") or d.get("title1") or "Section",
-                "type": d.get("type"),  # e.g., 'movie', 'show', 'artist', etc.
-            })
+            out.append(
+                {
+                    "key": str(d.get("key")),
+                    "title": d.get("title") or d.get("title1") or "Section",
+                    "type": d.get("type"),  # e.g., 'movie', 'show', 'artist', etc.
+                }
+            )
         return out

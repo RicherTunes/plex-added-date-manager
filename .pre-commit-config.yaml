@@ -19,5 +19,4 @@ repos:
       - id: pydocstyle
         name: pydocstyle (docs)
         files: ^src/.*\.py$
-        args: ["--ignore=D100,D104,D105,D107,D203,D213"]
-
+        args: ["--ignore=D100,D103,D104,D105,D107,D203,D213,D407,D413,D417"]

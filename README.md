@@ -93,6 +93,7 @@ CLI utilities:
 - Section discovery: Section selector is auto-populated from your Plex server (Movies vs Shows).
 - Select all results: With current filters applied, select items across all pages; also includes "Clear all".
 - QoL toggles: Show/hide images and enable/disable per-item edit controls to keep the UI light.
+ - Density modes: `Ultra Compact`, `Compact`, `Comfortable`, and `Spacious` now scale the entire UI (spacing, control heights, chips/titles, fixed pager height, sticky filter offset, and poster sizes), not just list rows.
 
 Notes:
 - Movies use section id default `1`, shows use default `2`. Adjust in the UI if yours differ.
