@@ -1,5 +1,7 @@
 # Plex Added Date Manager
 
+[![CI](https://github.com/RicherTunes/plex-added-date-manager/actions/workflows/ci.yml/badge.svg)](https://github.com/RicherTunes/plex-added-date-manager/actions/workflows/ci.yml)
+
 Streamlit (Python) app that interacts with the Plex API to fetch and manage movie data (Specifically Added Date).
 
 <img width="1231" alt="screen" src="https://github.com/user-attachments/assets/3fae4793-9799-48d8-9715-62fc80f95601" />
@@ -100,19 +102,16 @@ Notes:
 
 ## Known Limitations
 
-- Large libraries (thousands of items): The app currently renders your entire library on a single page. For each item it creates an image, a date input, and an update button. Streamlit must serialize all of those widgets (and any media) and send them to the browser over a WebSocket. With several thousand items, that payload becomes very large and can exceed Streamlit’s message-size/memory limits or your browser’s memory, which is why it tends to crash around ~3k items.
+- Very large pages: Server-side pagination is implemented, but rendering hundreds of widgets with images on a single page can still feel heavy. Prefer page sizes of 50–200 and disable images when working through huge libraries.
+- No virtualization: Lists are not virtualized yet; we rely on pagination instead.
+- Network hiccups: Batch updates already retry with backoff, but a flaky connection may still surface transient errors in the UI log.
 
-### Workarounds (legacy builds)
-
-- Use the new pagination + filters to keep render sizes small.
-- Reduce UI load by toggling images off when working with large pages.
-- Advanced: You can raise Streamlit’s server message size via `.streamlit/config.toml` (e.g., `maxMessageSize = 500`), but the new pagination generally makes this unnecessary.
-
-### Planned Fix
-
-- Add server-side pagination + filtering so only a small subset of items is rendered at a time.
-- Optionally add a lightweight CLI/batch mode for bulk updates without the UI.
+## UI Density
+- Modes: Ultra Compact, Compact, Comfortable, Spacious.
+- Persistence: remembers your last density; new sessions default to Spacious on touch, Comfortable otherwise (configurable).
+- Reset All: restores defaults and clears nav query params.
 
 ## License
 
 This project is licensed under the MIT License. See the LICENSE file for more details.
+
