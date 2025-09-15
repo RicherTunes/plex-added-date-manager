@@ -66,9 +66,13 @@ class PlexAPI:
             "X-Plex-Container-Size": str(size),
         }
         if filters:
-            params.update({k: str(v) for k, v in filters.items() if v not in (None, "")})
+            params.update(
+                {k: str(v) for k, v in filters.items() if v not in (None, "")}
+            )
 
-        response = self.session.get(url, headers=self._get_headers(), params=params, timeout=30)
+        response = self.session.get(
+            url, headers=self._get_headers(), params=params, timeout=30
+        )
         response.raise_for_status()
         container = response.json().get("MediaContainer", {})
         items = container.get("Metadata", []) or []
@@ -107,7 +111,9 @@ class PlexAPI:
         }
         if lock:
             params["addedAt.locked"] = "1"
-        response = self.session.put(url, params=params, headers=self._get_headers(), timeout=30)
+        response = self.session.put(
+            url, params=params, headers=self._get_headers(), timeout=30
+        )
         response.raise_for_status()
         return True
 
@@ -133,9 +139,11 @@ class PlexAPI:
         # Normalize fields
         out: List[dict] = []
         for d in dirs:
-            out.append({
-                "key": str(d.get("key")),
-                "title": d.get("title") or d.get("title1") or "Section",
-                "type": d.get("type"),  # e.g., 'movie', 'show', 'artist', etc.
-            })
+            out.append(
+                {
+                    "key": str(d.get("key")),
+                    "title": d.get("title") or d.get("title1") or "Section",
+                    "type": d.get("type"),  # e.g., 'movie', 'show', 'artist', etc.
+                }
+            )
         return out

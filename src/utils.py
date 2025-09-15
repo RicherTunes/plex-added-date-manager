@@ -6,12 +6,14 @@ def format_date(date_string):
     except ValueError:
         return None
 
+
 def validate_date(date):
     from datetime import datetime
 
     if isinstance(date, datetime):
         return True
     return False
+
 
 def format_movie_data(movie):
     return {

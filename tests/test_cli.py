@@ -26,7 +26,9 @@ def test_parse_args_list_sections():
 def test_to_unix_valid_roundtrip():
     ds = "2024-01-15"
     expected = int(
-        datetime.datetime.combine(datetime.date(2024, 1, 15), datetime.time.min).timestamp()
+        datetime.datetime.combine(
+            datetime.date(2024, 1, 15), datetime.time.min
+        ).timestamp()
     )
     assert to_unix(ds) == expected
 
@@ -37,4 +39,3 @@ def test_to_unix_invalid_raises():
         assert False, "Expected SystemExit for invalid date"
     except SystemExit as e:
         assert "Invalid --date value" in str(e)
-

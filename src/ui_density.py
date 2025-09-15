@@ -25,7 +25,11 @@ def maybe_apply_density_from_query() -> None:
                 st.query_params[k] = v
         except Exception:
             try:
-                qp2 = {k: (v[0] if isinstance(v, list) else v) for k, v in qp.items() if k != "ui_density"}
+                qp2 = {
+                    k: (v[0] if isinstance(v, list) else v)
+                    for k, v in qp.items()
+                    if k != "ui_density"
+                }
                 st.experimental_set_query_params(**qp2)  # type: ignore[attr-defined]
             except Exception:
                 pass
@@ -77,10 +81,34 @@ def apply_density() -> None:
         density = "Comfortable"
 
     tokens = {
-        "Ultra Compact": {"scale": 0.8, "control_h": 28, "nav_h": 40, "icon": 14, "radius": 6},
-        "Compact": {"scale": 0.9, "control_h": 32, "nav_h": 44, "icon": 16, "radius": 7},
-        "Comfortable": {"scale": 1.0, "control_h": 36, "nav_h": 48, "icon": 16, "radius": 8},
-        "Spacious": {"scale": 1.15, "control_h": 44, "nav_h": 56, "icon": 18, "radius": 10},
+        "Ultra Compact": {
+            "scale": 0.8,
+            "control_h": 28,
+            "nav_h": 40,
+            "icon": 14,
+            "radius": 6,
+        },
+        "Compact": {
+            "scale": 0.9,
+            "control_h": 32,
+            "nav_h": 44,
+            "icon": 16,
+            "radius": 7,
+        },
+        "Comfortable": {
+            "scale": 1.0,
+            "control_h": 36,
+            "nav_h": 48,
+            "icon": 16,
+            "radius": 8,
+        },
+        "Spacious": {
+            "scale": 1.15,
+            "control_h": 44,
+            "nav_h": 56,
+            "icon": 18,
+            "radius": 10,
+        },
     }[density]
 
     scale = tokens["scale"]
@@ -97,7 +125,7 @@ def apply_density() -> None:
     t100 = max(12, int(round(12 * scale)))
     t200 = max(13, int(round(14 * scale)))
 
-    ptr_default = '1' if bool(st.session_state.get('ui_ptr_default', True)) else '0'
+    ptr_default = "1" if bool(st.session_state.get("ui_ptr_default", True)) else "0"
     css = f"""
     <style>
       :root {{
@@ -139,4 +167,3 @@ def apply_density() -> None:
     """
 
     st.markdown(css, unsafe_allow_html=True)
-

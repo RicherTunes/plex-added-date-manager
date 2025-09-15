@@ -19,6 +19,7 @@ from string import Template
 
 st.set_page_config(page_title="Plex Added Date Manager", layout="wide")
 
+
 def _maybe_apply_density_from_query() -> None:
     try:
         qp = dict(st.query_params)
@@ -42,7 +43,11 @@ def _maybe_apply_density_from_query() -> None:
                 st.query_params[k] = v
         except Exception:
             try:
-                qp2 = {k: (v[0] if isinstance(v, list) else v) for k, v in qp.items() if k != "ui_density"}
+                qp2 = {
+                    k: (v[0] if isinstance(v, list) else v)
+                    for k, v in qp.items()
+                    if k != "ui_density"
+                }
                 st.experimental_set_query_params(**qp2)  # type: ignore[attr-defined]
             except Exception:
                 pass
@@ -73,6 +78,7 @@ def _inject_density_bootstrap() -> None:
     except Exception:
         pass
 
+
 # Lightweight styling
 st.markdown(
     """
@@ -101,10 +107,19 @@ def _safe_rerun() -> None:
         pass
 
 
-def _nav(prefix: str, position: str, cfg: Dict, total_pages: int, total: int, page_state_key: str) -> None:
+def _nav(
+    prefix: str,
+    position: str,
+    cfg: Dict,
+    total_pages: int,
+    total: int,
+    page_state_key: str,
+) -> None:
     nav_l, nav_c, nav_r = st.columns([1, 2, 2])
     with nav_l:
-        if st.button("< Prev", key=f"{prefix}_{position}_prev", disabled=cfg["page"] <= 1):
+        if st.button(
+            "< Prev", key=f"{prefix}_{position}_prev", disabled=cfg["page"] <= 1
+        ):
             st.session_state[page_state_key] = max(1, int(cfg["page"]) - 1)
             _safe_rerun()
     with nav_c:
@@ -121,8 +136,14 @@ def _nav(prefix: str, position: str, cfg: Dict, total_pages: int, total: int, pa
         if st.button("Go", key=f"{prefix}_{position}_go"):
             st.session_state[page_state_key] = int(goto)
             _safe_rerun()
-        if st.button("Next >", key=f"{prefix}_{position}_next", disabled=int(cfg["page"]) >= int(total_pages)):
-            st.session_state[page_state_key] = min(int(total_pages), int(cfg["page"]) + 1)
+        if st.button(
+            "Next >",
+            key=f"{prefix}_{position}_next",
+            disabled=int(cfg["page"]) >= int(total_pages),
+        ):
+            st.session_state[page_state_key] = min(
+                int(total_pages), int(cfg["page"]) + 1
+            )
             _safe_rerun()
 
 
@@ -178,13 +199,24 @@ def _handle_query_nav(prefix: str, page_state_key: str, total_pages: int) -> Non
         _safe_rerun()
 
 
-def _inject_fixed_pager(prefix: str, tab_label: str, page: int, total_pages: int) -> None:
+def _inject_fixed_pager(
+    prefix: str, tab_label: str, page: int, total_pages: int
+) -> None:
     # Size bar using current density
     density = st.session_state.get("ui_density", "Comfortable")
-    nav_h = {"Ultra Compact": 40, "Compact": 44, "Comfortable": 48, "Spacious": 56}.get(density, 48)
-    font_px = {"Ultra Compact": 12, "Compact": 12, "Comfortable": 13, "Spacious": 14}.get(density, 13)
+    nav_h = {"Ultra Compact": 40, "Compact": 44, "Comfortable": 48, "Spacious": 56}.get(
+        density, 48
+    )
+    font_px = {
+        "Ultra Compact": 12,
+        "Compact": 12,
+        "Comfortable": 13,
+        "Spacious": 14,
+    }.get(density, 13)
     muted_px = max(font_px - 1, 11)
-    pad_v = {"Ultra Compact": 4, "Compact": 6, "Comfortable": 6, "Spacious": 8}.get(density, 6)
+    pad_v = {"Ultra Compact": 4, "Compact": 6, "Comfortable": 6, "Spacious": 8}.get(
+        density, 6
+    )
     tpl = Template(
         """
         <style>
@@ -244,7 +276,17 @@ def _inject_fixed_pager(prefix: str, tab_label: str, page: int, total_pages: int
         </script>
         """
     )
-    html = tpl.safe_substitute(prefix=str(prefix), tab=str(tab_label), page=str(page), total=str(total_pages), max=str(max(1, int(total_pages))), nav_h=str(nav_h), font_px=str(font_px), muted_px=str(muted_px), pad_v=str(pad_v))
+    html = tpl.safe_substitute(
+        prefix=str(prefix),
+        tab=str(tab_label),
+        page=str(page),
+        total=str(total_pages),
+        max=str(max(1, int(total_pages))),
+        nav_h=str(nav_h),
+        font_px=str(font_px),
+        muted_px=str(muted_px),
+        pad_v=str(pad_v),
+    )
     try:
         components.v1.html(html, height=nav_h)  # type: ignore[attr-defined]
     except Exception:
@@ -264,7 +306,9 @@ def _cached_fetch(
 ) -> Tuple[List[dict], int]:
     p = PlexAPI(base_url=base_url, token=token)
     filters = {"year": year} if year else None
-    return p.fetch_items(section_id, type_id, start=start, size=size, sort=sort, filters=filters)
+    return p.fetch_items(
+        section_id, type_id, start=start, size=size, sort=sort, filters=filters
+    )
 
 
 def _init_state() -> None:
@@ -305,10 +349,34 @@ def _apply_density() -> None:
         density = "Comfortable"
 
     tokens = {
-        "Ultra Compact": {"scale": 0.8, "control_h": 28, "nav_h": 40, "icon": 14, "radius": 6},
-        "Compact": {"scale": 0.9, "control_h": 32, "nav_h": 44, "icon": 16, "radius": 7},
-        "Comfortable": {"scale": 1.0, "control_h": 36, "nav_h": 48, "icon": 16, "radius": 8},
-        "Spacious": {"scale": 1.15, "control_h": 44, "nav_h": 56, "icon": 18, "radius": 10},
+        "Ultra Compact": {
+            "scale": 0.8,
+            "control_h": 28,
+            "nav_h": 40,
+            "icon": 14,
+            "radius": 6,
+        },
+        "Compact": {
+            "scale": 0.9,
+            "control_h": 32,
+            "nav_h": 44,
+            "icon": 16,
+            "radius": 7,
+        },
+        "Comfortable": {
+            "scale": 1.0,
+            "control_h": 36,
+            "nav_h": 48,
+            "icon": 16,
+            "radius": 8,
+        },
+        "Spacious": {
+            "scale": 1.15,
+            "control_h": 44,
+            "nav_h": 56,
+            "icon": 18,
+            "radius": 10,
+        },
     }[density]
 
     scale = tokens["scale"]
@@ -378,7 +446,11 @@ def _controls(prefix: str, *, sections: List[dict], required_type: str) -> Dict:
     lock_key = f"{prefix}_lock_added"
 
     # Section dropdown (filtered by type)
-    typed = [s for s in sections if s.get("type") == ("movie" if required_type == "1" else "show")]
+    typed = [
+        s
+        for s in sections
+        if s.get("type") == ("movie" if required_type == "1" else "show")
+    ]
     labels = [f"{s['title']} (#{s['key']})" for s in typed]
     label_to_key = {f"{s['title']} (#{s['key']})": s["key"] for s in typed}
 
@@ -388,10 +460,14 @@ def _controls(prefix: str, *, sections: List[dict], required_type: str) -> Dict:
             # preserve current selection if possible
             curr = st.session_state.get(section_key)
             try:
-                idx = labels.index(next(lbl for lbl in labels if label_to_key[lbl] == curr))
+                idx = labels.index(
+                    next(lbl for lbl in labels if label_to_key[lbl] == curr)
+                )
             except Exception:
                 idx = 0
-            chosen = st.selectbox("Section", options=labels, index=idx, key=f"{prefix}_section_label")
+            chosen = st.selectbox(
+                "Section", options=labels, index=idx, key=f"{prefix}_section_label"
+            )
             st.session_state[section_key] = label_to_key[chosen]
         else:
             st.text_input("Section ID", key=section_key)
@@ -400,7 +476,14 @@ def _controls(prefix: str, *, sections: List[dict], required_type: str) -> Dict:
     with r1c3:
         st.selectbox(
             "Sort",
-            ["addedAt:desc", "addedAt:asc", "titleSort:asc", "titleSort:desc", "year:desc", "year:asc"],
+            [
+                "addedAt:desc",
+                "addedAt:asc",
+                "titleSort:asc",
+                "titleSort:desc",
+                "year:desc",
+                "year:asc",
+            ],
             key=sort_key,
         )
     with r1c4:
@@ -457,7 +540,9 @@ def _render_items(
     # Batch controls
     left, mid, right = st.columns([2, 3, 2])
     with left:
-        page_select_all = st.checkbox("Select all on page", key=f"{key_prefix}_select_all")
+        page_select_all = st.checkbox(
+            "Select all on page", key=f"{key_prefix}_select_all"
+        )
         b1, b2, b3 = st.columns(3)
         with b1:
             if st.button("Select all results", key=f"{key_prefix}_select_all_results"):
@@ -477,7 +562,11 @@ def _render_items(
                         )
                         total_known = total
                         if title_filter:
-                            batch_items = [i for i in batch_items if title_filter in (i.get("title", "").lower())]
+                            batch_items = [
+                                i
+                                for i in batch_items
+                                if title_filter in (i.get("title", "").lower())
+                            ]
                         for it in batch_items:
                             rk = str(it.get("ratingKey"))
                             if rk:
@@ -489,7 +578,9 @@ def _render_items(
                         progress.progress(min(100, int(start * 100 / max(1, total))))
                 finally:
                     progress.progress(100)
-                st.success(f"Selected {selected_count} items across results (total ~{total_known}).")
+                st.success(
+                    f"Selected {selected_count} items across results (total ~{total_known})."
+                )
         with b2:
             if st.button("Clear all", key=f"{key_prefix}_clear_all"):
                 selected.clear()
@@ -502,25 +593,43 @@ def _render_items(
                         selected[rk] = False
                 st.success("Cleared selections on this page.")
     with mid:
-        batch_date = st.date_input("Batch date", value=datetime.date.today(), key=f"{key_prefix}_batch_date")
-        max_per_min = st.number_input("Max/min (0=unlimited)", min_value=0, value=0, step=30, key=f"{key_prefix}_max_per_min")
+        batch_date = st.date_input(
+            "Batch date", value=datetime.date.today(), key=f"{key_prefix}_batch_date"
+        )
+        max_per_min = st.number_input(
+            "Max/min (0=unlimited)",
+            min_value=0,
+            value=0,
+            step=30,
+            key=f"{key_prefix}_max_per_min",
+        )
     with right:
         if st.button("Apply to selected", key=f"{key_prefix}_apply_batch"):
             keys = [k for k, v in selected.items() if v]
             if not keys:
                 st.warning("No items selected.")
             else:
-                new_unix = int(datetime.datetime.combine(batch_date, datetime.time.min).timestamp())
+                new_unix = int(
+                    datetime.datetime.combine(batch_date, datetime.time.min).timestamp()
+                )
                 total_sel = len(keys)
                 progress = st.progress(0)
                 successes = 0
-                per_item_sleep = (60.0 / max_per_min) if max_per_min and max_per_min > 0 else 0.0
+                per_item_sleep = (
+                    (60.0 / max_per_min) if max_per_min and max_per_min > 0 else 0.0
+                )
                 for idx, rating_key in enumerate(keys, start=1):
                     last_err = None
                     attempts = 0
                     while attempts < 4:
                         try:
-                            plex.update_added_date(section_id, rating_key, type_id, new_unix, lock=lock_added)
+                            plex.update_added_date(
+                                section_id,
+                                rating_key,
+                                type_id,
+                                new_unix,
+                                lock=lock_added,
+                            )
                             successes += 1
                             last_err = None
                             break
@@ -541,7 +650,7 @@ def _render_items(
 
     # Date range selection (advanced)
     with st.expander("Select by Added date range", expanded=False):
-        presets = st.columns([1,1,1,1,1,1,1])
+        presets = st.columns([1, 1, 1, 1, 1, 1, 1])
         today = datetime.date.today()
         # Preset handlers
         preset_actions = {
@@ -550,7 +659,6 @@ def _render_items(
             "Last 90": (today - datetime.timedelta(days=90), today),
             "Last 365": (today - datetime.timedelta(days=365), today),
             "This Year": (datetime.date(today.year, 1, 1), today),
-            
         }
         keys = list(preset_actions.keys())
         for i, name in enumerate(keys):
@@ -561,8 +669,12 @@ def _render_items(
                     st.session_state[f"{key_prefix}_range_to"] = end
         with presets[-2]:
             if st.button("Older >1y", key=f"{key_prefix}_preset_older"):
-                st.session_state[f"{key_prefix}_range_from"] = today - datetime.timedelta(days=365*50)
-                st.session_state[f"{key_prefix}_range_to"] = today - datetime.timedelta(days=365)
+                st.session_state[
+                    f"{key_prefix}_range_from"
+                ] = today - datetime.timedelta(days=365 * 50)
+                st.session_state[f"{key_prefix}_range_to"] = today - datetime.timedelta(
+                    days=365
+                )
         with presets[-1]:
             if st.button("Clear", key=f"{key_prefix}_preset_clear"):
                 st.session_state.pop(f"{key_prefix}_range_from", None)
@@ -570,13 +682,28 @@ def _render_items(
 
         rc1, rc2 = st.columns(2)
         with rc1:
-            range_from = st.date_input("From", key=f"{key_prefix}_range_from", value=st.session_state.get(f"{key_prefix}_range_from", today - datetime.timedelta(days=365)))
+            range_from = st.date_input(
+                "From",
+                key=f"{key_prefix}_range_from",
+                value=st.session_state.get(
+                    f"{key_prefix}_range_from", today - datetime.timedelta(days=365)
+                ),
+            )
         with rc2:
-            range_to = st.date_input("To", key=f"{key_prefix}_range_to", value=st.session_state.get(f"{key_prefix}_range_to", today))
+            range_to = st.date_input(
+                "To",
+                key=f"{key_prefix}_range_to",
+                value=st.session_state.get(f"{key_prefix}_range_to", today),
+            )
         act1, act2 = st.columns(2)
+
         def _select_range(select: bool):
-            start_ts = int(datetime.datetime.combine(range_from, datetime.time.min).timestamp())
-            end_ts = int(datetime.datetime.combine(range_to, datetime.time.max).timestamp())
+            start_ts = int(
+                datetime.datetime.combine(range_from, datetime.time.min).timestamp()
+            )
+            end_ts = int(
+                datetime.datetime.combine(range_to, datetime.time.max).timestamp()
+            )
             progress = st.progress(0)
             touched = 0
             try:
@@ -591,7 +718,11 @@ def _render_items(
                         filters=({"year": year} if year else None),
                     )
                     if title_filter:
-                        batch_items = [i for i in batch_items if title_filter in (i.get("title", "").lower())]
+                        batch_items = [
+                            i
+                            for i in batch_items
+                            if title_filter in (i.get("title", "").lower())
+                        ]
                     for it in batch_items:
                         at = int(it.get("addedAt", 0) or 0)
                         if start_ts <= at <= end_ts:
@@ -605,7 +736,10 @@ def _render_items(
                     progress.progress(min(100, int(start * 100 / max(1, total))))
             finally:
                 progress.progress(100)
-            st.success(("Selected" if select else "Deselected") + f" {touched} items in range.")
+            st.success(
+                ("Selected" if select else "Deselected") + f" {touched} items in range."
+            )
+
         with act1:
             if st.button("Select range", key=f"{key_prefix}_select_range"):
                 _select_range(True)
@@ -619,7 +753,9 @@ def _render_items(
         cols = st.columns(cols_widths)
         with cols[0]:
             checked = page_select_all or selected.get(rating_key, False)
-            sel = st.checkbox("Select", key=f"{key_prefix}_sel_{rating_key}", value=checked)
+            sel = st.checkbox(
+                "Select", key=f"{key_prefix}_sel_{rating_key}", value=checked
+            )
             selected[rating_key] = sel
             if show_images:
                 thumb = item.get("thumb")
@@ -631,7 +767,10 @@ def _render_items(
             year = item.get("year")
             rel = item.get("originallyAvailableAt") or "-"
             display = f"{title} ({year})" if year else title
-            st.markdown(f"<div class='title-row'><h3>{display}</h3></div>", unsafe_allow_html=True)
+            st.markdown(
+                f"<div class='title-row'><h3>{display}</h3></div>",
+                unsafe_allow_html=True,
+            )
 
             # Added (inline editable)
             added_at = item.get("addedAt")
@@ -645,19 +784,30 @@ def _render_items(
             def _on_change_inline(rk=rating_key):
                 try:
                     d = st.session_state[date_key]
-                    new_unix = int(datetime.datetime.combine(d, datetime.time.min).timestamp())
-                    plex.update_added_date(section_id, rk, type_id, new_unix, lock=lock_added)
-                    st.toast(f"Saved {title}") if hasattr(st, "toast") else st.success(f"Saved {title}")
+                    new_unix = int(
+                        datetime.datetime.combine(d, datetime.time.min).timestamp()
+                    )
+                    plex.update_added_date(
+                        section_id, rk, type_id, new_unix, lock=lock_added
+                    )
+                    st.toast(f"Saved {title}") if hasattr(st, "toast") else st.success(
+                        f"Saved {title}"
+                    )
                 except Exception as e:  # noqa: BLE001
                     st.error(f"Failed to save {title}: {e}")
 
             date_kwargs = {}
             if date_key not in st.session_state:
                 date_kwargs["value"] = added_dt.date()
-            st.date_input("Added", key=date_key, on_change=_on_change_inline, **date_kwargs)
+            st.date_input(
+                "Added", key=date_key, on_change=_on_change_inline, **date_kwargs
+            )
 
             # Secondary info chips
-            st.markdown(f"<span class='chip'>Release {rel}</span> <span class='chip'>ID {rating_key}</span>", unsafe_allow_html=True)
+            st.markdown(
+                f"<span class='chip'>Release {rel}</span> <span class='chip'>ID {rating_key}</span>",
+                unsafe_allow_html=True,
+            )
 
 
 def main() -> None:
@@ -667,16 +817,27 @@ def main() -> None:
     # Header row with density selector and Settings link
     hdr_l, hdr_c, hdr_r, hdr_s = st.columns([3, 1, 1, 1])
     with hdr_l:
-        st.markdown("<h3 style='margin-bottom:0.25rem'>Plex Added Date Manager</h3>", unsafe_allow_html=True)
+        st.markdown(
+            "<h3 style='margin-bottom:0.25rem'>Plex Added Date Manager</h3>",
+            unsafe_allow_html=True,
+        )
     with hdr_c:
-        st.selectbox("Density", ["Comfortable", "Compact", "Ultra Compact", "Spacious"], key="ui_density")
+        st.selectbox(
+            "Density",
+            ["Comfortable", "Compact", "Ultra Compact", "Spacious"],
+            key="ui_density",
+        )
     with hdr_r:
         if st.button("Reset All"):
             # Reset common keys
             for k in list(st.session_state.keys()):
-                if k.startswith('movie_') or k.startswith('show_') or k in {'ui_density'}:
+                if (
+                    k.startswith("movie_")
+                    or k.startswith("show_")
+                    or k in {"ui_density"}
+                ):
                     st.session_state.pop(k, None)
-            st.session_state['ui_density'] = 'Comfortable'
+            st.session_state["ui_density"] = "Comfortable"
             # Clear nav query params
             try:
                 st.query_params.clear()
@@ -688,10 +849,14 @@ def main() -> None:
             st.rerun()
     with hdr_s:
         if st.button("Settings", help="Open preferences (density defaults)"):
-            st.session_state["ui_show_settings"] = not st.session_state.get("ui_show_settings", False)
+            st.session_state["ui_show_settings"] = not st.session_state.get(
+                "ui_show_settings", False
+            )
             _safe_rerun()
     # Settings expander
-    with st.expander("Settings", expanded=bool(st.session_state.get("ui_show_settings", False))):
+    with st.expander(
+        "Settings", expanded=bool(st.session_state.get("ui_show_settings", False))
+    ):
         st.checkbox(
             "Prefer Spacious on touch",
             key="ui_ptr_default",
@@ -700,9 +865,12 @@ def main() -> None:
         if st.button("Reset density only"):
             st.session_state["ui_density"] = "Comfortable"
             try:
-                components.v1.html("""
+                components.v1.html(
+                    """
                   <script> try { localStorage.removeItem('ui_density'); } catch(e) {} </script>
-                """, height=0)  # type: ignore[attr-defined]
+                """,
+                    height=0,
+                )  # type: ignore[attr-defined]
             except Exception:
                 pass
             _safe_rerun()
@@ -727,7 +895,9 @@ def main() -> None:
         cfg = _controls("movie", sections=sections, required_type="1")
         _inject_sticky_filters(
             "Movies",
-            top_offset_px=56 if st.session_state.get("ui_density") == "Spacious" else (44 if st.session_state.get("ui_density") == "Compact" else 48),
+            top_offset_px=56
+            if st.session_state.get("ui_density") == "Spacious"
+            else (44 if st.session_state.get("ui_density") == "Compact" else 48),
         )
         section_id = cfg["section_id"] or "1"
         type_id = "1"
@@ -753,7 +923,9 @@ def main() -> None:
         if title_filter:
             items = [i for i in items if title_filter in (i.get("title", "").lower())]
 
-        total_pages = max(1, (total + int(cfg["page_size"]) - 1) // int(cfg["page_size"]))
+        total_pages = max(
+            1, (total + int(cfg["page_size"]) - 1) // int(cfg["page_size"])
+        )
         _inject_fixed_pager("movie", "Movies", int(cfg["page"]), int(total_pages))
         _handle_query_nav("movie", "movie_page", int(total_pages))
         _nav("movie", "top", cfg, total_pages, total, "movie_page")
@@ -783,7 +955,9 @@ def main() -> None:
         cfg = _controls("show", sections=sections, required_type="2")
         _inject_sticky_filters(
             "TV Series",
-            top_offset_px=56 if st.session_state.get("ui_density") == "Spacious" else (44 if st.session_state.get("ui_density") == "Compact" else 48),
+            top_offset_px=56
+            if st.session_state.get("ui_density") == "Spacious"
+            else (44 if st.session_state.get("ui_density") == "Compact" else 48),
         )
         section_id = cfg["section_id"] or "2"
         type_id = "2"
@@ -808,7 +982,9 @@ def main() -> None:
         if title_filter:
             items = [i for i in items if title_filter in (i.get("title", "").lower())]
 
-        total_pages = max(1, (total + int(cfg["page_size"]) - 1) // int(cfg["page_size"]))
+        total_pages = max(
+            1, (total + int(cfg["page_size"]) - 1) // int(cfg["page_size"])
+        )
         _inject_fixed_pager("show", "TV Series", int(cfg["page"]), int(total_pages))
         _handle_query_nav("show", "show_page", int(total_pages))
         _nav("show", "top", cfg, total_pages, total, "show_page")
@@ -889,28 +1065,3 @@ def _inject_sticky_filters(tab_label: str, top_offset_px: int = 48) -> None:
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
