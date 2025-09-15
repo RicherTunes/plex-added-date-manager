@@ -79,6 +79,19 @@ def _qp_set(params: Dict[str, str]) -> None:
             pass
 
 
+def clear_nav_params(prefixes: List[str]) -> None:
+    """Remove nav-related query params (prev/next/goto) for given prefixes."""
+    q = _qp_get()
+    changed = False
+    for p in prefixes:
+        for k in (f"{p}_nav", f"{p}_goto"):
+            if k in q:
+                del q[k]
+                changed = True
+    if changed:
+        _qp_set({k: (v[0] if isinstance(v, list) else v) for k, v in q.items()})
+
+
 def _handle_query_nav(prefix: str, page_state_key: str, total_pages: int) -> None:
     q = _qp_get()
     nav_key = f"{prefix}_nav"

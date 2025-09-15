@@ -101,18 +101,9 @@ Notes:
 
 ## Known Limitations
 
-- Large libraries (thousands of items): The app currently renders your entire library on a single page. For each item it creates an image, a date input, and an update button. Streamlit must serialize all of those widgets (and any media) and send them to the browser over a WebSocket. With several thousand items, that payload becomes very large and can exceed Streamlit’s message-size/memory limits or your browser’s memory, which is why it tends to crash around ~3k items.
-
-### Workarounds (legacy builds)
-
-- Use the new pagination + filters to keep render sizes small.
-- Reduce UI load by toggling images off when working with large pages.
-- Advanced: You can raise Streamlit’s server message size via `.streamlit/config.toml` (e.g., `maxMessageSize = 500`), but the new pagination generally makes this unnecessary.
-
-### Planned Fix
-
-- Add server-side pagination + filtering so only a small subset of items is rendered at a time.
-- Optionally add a lightweight CLI/batch mode for bulk updates without the UI.
+- Very large pages: Server-side pagination is implemented, but rendering hundreds of widgets with images on a single page can still feel heavy. Prefer page sizes of 50–200 and disable images when working through huge libraries.
+- No virtualization: Lists are not virtualized yet; we rely on pagination instead.
+- Network hiccups: Batch updates already retry with backoff, but a flaky connection may still surface transient errors in the UI log.
 
 ## More Docs
 

@@ -1,8 +1,9 @@
 """UI controls and session-state helpers for the Streamlit app."""
 
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import streamlit as st
+from streamlit import components
 
 
 def _init_state() -> None:
@@ -29,6 +30,33 @@ def _init_state() -> None:
     }
     for k, v in defaults.items():
         st.session_state.setdefault(k, v)
+
+
+def _reset_all() -> None:
+    """Reset all UI state to defaults, including density and selections."""
+    defaults = {
+        "movie_page": 1,
+        "movie_page_size": 100,
+        "movie_selected": {},
+        "movie_show_images": True,
+        "movie_sort": "addedAt:desc",
+        "movie_year_filter": "",
+        "movie_title_filter": "",
+        "movie_section": "1",
+        "movie_lock_added": True,
+        "show_page": 1,
+        "show_page_size": 100,
+        "show_selected": {},
+        "show_show_images": True,
+        "show_sort": "addedAt:desc",
+        "show_year_filter": "",
+        "show_title_filter": "",
+        "show_section": "2",
+        "show_lock_added": True,
+        "ui_density": "Comfortable",
+    }
+    for k, v in defaults.items():
+        st.session_state[k] = v
 
 
 def _apply_density() -> None:
@@ -109,10 +137,82 @@ def _apply_density() -> None:
     <script>
       // Expose density on the parent document for custom components
       try {{ parent.document.documentElement.dataset.density = '{density}'.toLowerCase().replace(' ', '-'); }} catch(e) {{}}
+      try {{ localStorage.setItem('ui_density', '{density}'); }} catch(e) {{}}
     </script>
     """
 
     st.markdown(css, unsafe_allow_html=True)
+
+
+def _maybe_apply_density_from_query() -> None:
+    """If ?ui_density=X is present, apply to session and remove the param.
+
+    Keeps other query params intact. Supports both modern st.query_params and
+    legacy experimental_* APIs.
+    """
+    valid = {"Ultra Compact", "Compact", "Comfortable", "Spacious"}
+    # Read
+    qp: Dict[str, List[str]]
+    try:
+        qp = dict(st.query_params)
+    except Exception:
+        try:
+            qp = st.experimental_get_query_params()  # type: ignore[attr-defined]
+        except Exception:
+            qp = {}
+    if not qp:
+        return
+    raw = qp.get("ui_density")
+    val: Optional[str] = None
+    if raw:
+        val = raw[0] if isinstance(raw, list) else str(raw)
+    if val and val in valid:
+        if st.session_state.get("ui_density") != val:
+            st.session_state["ui_density"] = val
+        # Remove the param but keep others
+        if "ui_density" in qp:
+            del qp["ui_density"]
+        try:
+            st.query_params.clear()
+            for k, v in qp.items():
+                st.query_params[k] = v
+        except Exception:
+            try:
+                # experimental_set_query_params expects kwargs
+                qp_simple = {k: (v[0] if isinstance(v, list) else v) for k, v in qp.items()}
+                st.experimental_set_query_params(**qp_simple)  # type: ignore[attr-defined]
+            except Exception:
+                pass
+
+
+def _inject_density_bootstrap() -> None:
+    """One-time bootstrap from localStorage -> query param to hydrate SSR.
+
+    Avoids infinite loops by using sessionStorage flag.
+    """
+    cur = st.session_state.get("ui_density", "Comfortable")
+    html = f"""
+    <script>
+      (function(){{
+        try {{
+          const serverDensity = {cur!r};
+          const bootKey = 'ui_density_boot';
+          const ls = localStorage.getItem('ui_density');
+          const booted = sessionStorage.getItem(bootKey);
+          if (ls && !booted && ls !== serverDensity) {{
+            const url = new URL(parent.location);
+            url.searchParams.set('ui_density', ls);
+            sessionStorage.setItem(bootKey, '1');
+            parent.location.replace(url.toString());
+          }}
+        }} catch(e){{}}
+      }})();
+    </script>
+    """
+    try:
+        components.v1.html(html, height=0)  # type: ignore[attr-defined]
+    except Exception:
+        pass
 
 
 def _controls(prefix: str, *, sections: List[dict], required_type: str) -> Dict:
