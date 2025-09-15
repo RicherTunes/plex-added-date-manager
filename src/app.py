@@ -664,8 +664,8 @@ def main() -> None:
     # Density persistence (localStorage → query) and initial hydrate
     _maybe_apply_density_from_query()
     _inject_density_bootstrap()
-    # Header row with density selector
-    hdr_l, hdr_c, hdr_r = st.columns([3, 1, 1])
+    # Header row with density selector and Settings link
+    hdr_l, hdr_c, hdr_r, hdr_s = st.columns([3, 1, 1, 1])
     with hdr_l:
         st.markdown("<h3 style='margin-bottom:0.25rem'>Plex Added Date Manager</h3>", unsafe_allow_html=True)
     with hdr_c:
@@ -686,13 +686,26 @@ def main() -> None:
                 except Exception:
                     pass
             st.rerun()
+    with hdr_s:
+        if st.button("Settings", help="Open preferences (density defaults)"):
+            st.session_state["ui_show_settings"] = not st.session_state.get("ui_show_settings", False)
+            _safe_rerun()
     # Settings expander
-    with st.expander("Settings"):
+    with st.expander("Settings", expanded=bool(st.session_state.get("ui_show_settings", False))):
         st.checkbox(
             "Prefer Spacious on touch",
             key="ui_ptr_default",
             help="When enabled (default), new sessions on touch devices start in Spacious if no saved density exists.",
         )
+        if st.button("Reset density only"):
+            st.session_state["ui_density"] = "Comfortable"
+            try:
+                components.v1.html("""
+                  <script> try { localStorage.removeItem('ui_density'); } catch(e) {} </script>
+                """, height=0)  # type: ignore[attr-defined]
+            except Exception:
+                pass
+            _safe_rerun()
     _apply_density()
     _init_state()
 
