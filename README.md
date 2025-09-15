@@ -107,6 +107,7 @@ Notes:
 - Network hiccups: Batch updates already retry with backoff, but a flaky connection may still surface transient errors in the UI log.
 
 ## UI Density
+- Settings: Use the Settings link in the header to open the panel and toggle the pointer-aware default, or click Reset density only to return to Comfortable and clear the saved density.
 - Modes: Ultra Compact, Compact, Comfortable, Spacious.
 - Persistence: remembers your last density; new sessions default to Spacious on touch, Comfortable otherwise (configurable).
 - Reset All: restores defaults and clears nav query params.
@@ -114,4 +115,5 @@ Notes:
 ## License
 
 This project is licensed under the MIT License. See the LICENSE file for more details.
+
 
