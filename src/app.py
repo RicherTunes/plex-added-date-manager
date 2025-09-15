@@ -388,7 +388,7 @@ def _controls(prefix: str, *, sections: List[dict], required_type: str) -> Dict:
             # preserve current selection if possible
             curr = st.session_state.get(section_key)
             try:
-                idx = labels.index(next(l for l in labels if label_to_key[l] == curr))
+                idx = labels.index(next(lbl for lbl in labels if label_to_key[lbl] == curr))
             except Exception:
                 idx = 0
             chosen = st.selectbox("Section", options=labels, index=idx, key=f"{prefix}_section_label")
