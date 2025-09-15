@@ -56,7 +56,11 @@ def _inject_density_bootstrap() -> None:
         try {{
           const serverDensity = {cur!r};
           const bootKey = 'ui_density_boot';
-          const ls = localStorage.getItem('ui_density');
+          let ls = localStorage.getItem('ui_density');
+          if (!ls) {{
+            ls = (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) ? 'Spacious' : 'Comfortable';
+            localStorage.setItem('ui_density', ls);
+          }}
           const booted = sessionStorage.getItem(bootKey);
           if (ls && !booted && ls !== serverDensity) {{
             const url = new URL(parent.location);
