@@ -48,8 +48,11 @@ def inject_density_bootstrap() -> None:
           const bootKey = 'ui_density_boot';
           let ls = localStorage.getItem('ui_density');
           if (!ls) {{
-            // pointer-aware default when nothing saved
-            ls = (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) ? 'Spacious' : 'Comfortable';
+            // pointer-aware default when nothing saved; can be disabled via ui_ptr_default=0
+            const pref = localStorage.getItem('ui_ptr_default');
+            const preferSpacious = (pref === null || pref === '1');
+            const isTouch = (window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+            ls = (preferSpacious && isTouch) ? 'Spacious' : 'Comfortable';
             localStorage.setItem('ui_density', ls);
           }}
           const booted = sessionStorage.getItem(bootKey);
@@ -96,6 +99,7 @@ def apply_density() -> None:
     t100 = max(12, int(round(12 * scale)))
     t200 = max(13, int(round(14 * scale)))
 
+    ptr_default = '1' if bool(st.session_state.get('ui_ptr_default', True)) else '0'
     css = f"""
     <style>
       :root {{
@@ -132,6 +136,7 @@ def apply_density() -> None:
     <script>
       try {{ parent.document.documentElement.dataset.density = '{density}'.toLowerCase().replace(' ', '-'); }} catch(e) {{}}
       try {{ localStorage.setItem('ui_density', '{density}'); }} catch(e) {{}}
+      try {{ localStorage.setItem('ui_ptr_default', '{ptr_default}'); }} catch(e) {{}}
     </script>
     """
 

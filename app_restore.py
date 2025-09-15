@@ -664,8 +664,8 @@ def main() -> None:
     # Density persistence (localStorage → query) and initial hydrate
     _maybe_apply_density_from_query()
     _inject_density_bootstrap()
-    # Header row with density selector + pointer-aware default toggle
-    hdr_l, hdr_c, hdr_r, hdr_s = st.columns([3, 1, 1, 1])
+    # Header row with density selector
+    hdr_l, hdr_c, hdr_r = st.columns([3, 1, 1])
     with hdr_l:
         st.markdown("<h3 style='margin-bottom:0.25rem'>Plex Added Date Manager</h3>", unsafe_allow_html=True)
     with hdr_c:
@@ -686,12 +686,6 @@ def main() -> None:
                 except Exception:
                     pass
             st.rerun()
-    with hdr_s:
-        st.checkbox(
-            "Prefer Spacious on touch",
-            key="ui_ptr_default",
-            help="When enabled (default), new sessions on touch devices start in Spacious if no saved density exists.",
-        )
     _apply_density()
     _init_state()
 
@@ -875,7 +869,6 @@ def _inject_sticky_filters(tab_label: str, top_offset_px: int = 48) -> None:
 
 if __name__ == "__main__":
     main()
-
 
 
 
