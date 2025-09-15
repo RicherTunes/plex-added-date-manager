@@ -298,5 +298,6 @@ def _init_state() -> None:
         st.session_state.setdefault(k, v)
 
 
-def _apply_density() -> None:
-    __apply_density()
+def _apply_density() -> None:\n    __apply_density()\n
+
+
