@@ -19,6 +19,60 @@ from string import Template
 
 st.set_page_config(page_title="Plex Added Date Manager", layout="wide")
 
+def _maybe_apply_density_from_query() -> None:
+    try:
+        qp = dict(st.query_params)
+    except Exception:
+        try:
+            qp = st.experimental_get_query_params()  # type: ignore[attr-defined]
+        except Exception:
+            qp = {}
+    if not qp:
+        return
+    raw = qp.get("ui_density")
+    valid = {"Ultra Compact", "Compact", "Comfortable", "Spacious"}
+    val = raw[0] if isinstance(raw, list) else raw
+    if val and val in valid:
+        st.session_state["ui_density"] = val
+        try:
+            st.query_params.clear()
+            for k, v in qp.items():
+                if k == "ui_density":
+                    continue
+                st.query_params[k] = v
+        except Exception:
+            try:
+                qp2 = {k: (v[0] if isinstance(v, list) else v) for k, v in qp.items() if k != "ui_density"}
+                st.experimental_set_query_params(**qp2)  # type: ignore[attr-defined]
+            except Exception:
+                pass
+
+
+def _inject_density_bootstrap() -> None:
+    cur = st.session_state.get("ui_density", "Comfortable")
+    html = f"""
+    <script>
+      (function(){{
+        try {{
+          const serverDensity = {cur!r};
+          const bootKey = 'ui_density_boot';
+          const ls = localStorage.getItem('ui_density');
+          const booted = sessionStorage.getItem(bootKey);
+          if (ls && !booted && ls !== serverDensity) {{
+            const url = new URL(parent.location);
+            url.searchParams.set('ui_density', ls);
+            sessionStorage.setItem(bootKey, '1');
+            parent.location.replace(url.toString());
+          }}
+        }} catch(e){{}}
+      }})();
+    </script>
+    """
+    try:
+        components.v1.html(html, height=0)  # type: ignore[attr-defined]
+    except Exception:
+        pass
+
 # Lightweight styling
 st.markdown(
     """
@@ -125,19 +179,25 @@ def _handle_query_nav(prefix: str, page_state_key: str, total_pages: int) -> Non
 
 
 def _inject_fixed_pager(prefix: str, tab_label: str, page: int, total_pages: int) -> None:
+    # Size bar using current density
+    density = st.session_state.get("ui_density", "Comfortable")
+    nav_h = {"Ultra Compact": 40, "Compact": 44, "Comfortable": 48, "Spacious": 56}.get(density, 48)
+    font_px = {"Ultra Compact": 12, "Compact": 12, "Comfortable": 13, "Spacious": 14}.get(density, 13)
+    muted_px = max(font_px - 1, 11)
+    pad_v = {"Ultra Compact": 4, "Compact": 6, "Comfortable": 6, "Spacious": 8}.get(density, 6)
     tpl = Template(
         """
         <style>
           #fixed-pager-$prefix {
-            position: fixed; top: 0; left: 0; right: 0; height: 42px;
+            position: fixed; top: 0; left: 0; right: 0; height: ${nav_h}px;
             background: rgba(255,255,255,0.9); backdrop-filter: blur(4px);
             border-bottom: 1px solid #e5e7eb; z-index: 1000;
-            display: flex; align-items: center; gap: 8px; padding: 6px 12px; font-family: ui-sans-serif, system-ui;
+            display: flex; align-items: center; gap: 8px; padding: ${pad_v}px 12px; font-family: ui-sans-serif, system-ui; font-size: ${font_px}px;
           }
           #fixed-pager-$prefix input { width: 70px; }
           #fixed-pager-$prefix .spacer { flex: 1; }
-          #fixed-pager-$prefix .muted { color:#6b7280; font-size: 12px; }
-          @media (max-width: 640px) { #fixed-pager-$prefix { font-size: 12px; } }
+          #fixed-pager-$prefix .muted { color:#6b7280; font-size: ${muted_px}px; }
+          @media (max-width: 640px) { #fixed-pager-$prefix { font-size: ${muted_px}px; } }
         </style>
         <div id="fixed-pager-$prefix" style="display:none">
           <button class="prev" title="Prev">&lt; Prev</button>
@@ -184,11 +244,9 @@ def _inject_fixed_pager(prefix: str, tab_label: str, page: int, total_pages: int
         </script>
         """
     )
-    html = tpl.safe_substitute(
-        prefix=str(prefix), tab=str(tab_label), page=str(page), total=str(total_pages), max=str(max(1, int(total_pages)))
-    )
+    html = tpl.safe_substitute(prefix=str(prefix), tab=str(tab_label), page=str(page), total=str(total_pages), max=str(max(1, int(total_pages))), nav_h=str(nav_h), font_px=str(font_px), muted_px=str(muted_px), pad_v=str(pad_v))
     try:
-        components.v1.html(html, height=48)  # type: ignore[attr-defined]
+        components.v1.html(html, height=nav_h)  # type: ignore[attr-defined]
     except Exception:
         pass
 
@@ -235,30 +293,78 @@ def _init_state() -> None:
         st.session_state.setdefault(k, v)
 
 
-def _apply_density():
+def _apply_density() -> None:
+    """Apply global, density-aware CSS tokens for the whole UI.
+
+    Scales spacing, control sizes, typography, and chrome consistently.
+    Keeps legacy values working for "Ultra Compact".
+    """
     density = st.session_state.get("ui_density", "Comfortable")
-    if density == "Compact":
-        st.markdown(
-            """
-            <style>
-            /* Text sizes */
-            .title-row h3 { font-size: 1.0rem; }
-            .meta { font-size: 0.82rem; }
-            .chip { font-size: 0.70rem; padding: 1px 6px; }
-            /* Widget sizes */
-            .stButton button { padding: 4px 8px; font-size: 0.85rem; }
-            div[data-baseweb="select"] > div { min-height: 32px; }
-            .stSelectbox label, .stTextInput label, .stDateInput label, .stNumberInput label { font-size: 0.85rem; margin-bottom: 0.15rem; }
-            .stTextInput input, .stNumberInput input, .stDateInput input { height: 32px; font-size: 0.9rem; }
-            .stCheckbox label { font-size: 0.9rem; }
-            /* Images */
-            div[data-testid="stImage"] img { width: 80px !important; }
-            /* Slightly tighter container */
-            .block-container { padding-top: 2.6rem; }
-            </style>
-            """,
-            unsafe_allow_html=True,
-        )
+
+    if density not in {"Ultra Compact", "Compact", "Comfortable", "Spacious"}:
+        density = "Comfortable"
+
+    tokens = {
+        "Ultra Compact": {"scale": 0.8, "control_h": 28, "nav_h": 40, "icon": 14, "radius": 6},
+        "Compact": {"scale": 0.9, "control_h": 32, "nav_h": 44, "icon": 16, "radius": 7},
+        "Comfortable": {"scale": 1.0, "control_h": 36, "nav_h": 48, "icon": 16, "radius": 8},
+        "Spacious": {"scale": 1.15, "control_h": 44, "nav_h": 56, "icon": 18, "radius": 10},
+    }[density]
+
+    scale = tokens["scale"]
+    control_h = tokens["control_h"]
+    nav_h = tokens["nav_h"]
+    icon = tokens["icon"]
+    radius = tokens["radius"]
+
+    s1 = int(round(4 * scale))
+    s2 = int(round(8 * scale))
+    s3 = int(round(12 * scale))
+    s4 = int(round(16 * scale))
+
+    t100 = max(12, int(round(12 * scale)))
+    t200 = max(13, int(round(14 * scale)))
+
+    css = f"""
+    <style>
+      :root {{
+        --density: '{density}';
+        --scale: {scale};
+        --space-1: {s1}px;
+        --space-2: {s2}px;
+        --space-3: {s3}px;
+        --space-4: {s4}px;
+        --radius: {radius}px;
+        --control-h: {control_h}px;
+        --icon: {icon}px;
+        --nav-h: {nav_h}px;
+        --type-100: {t100}px;
+        --type-200: {t200}px;
+      }}
+
+      .block-container {{ padding-top: calc(var(--nav-h) + var(--space-2)); }}
+      [data-testid="stHeader"] {{ height: var(--nav-h) !important; }}
+
+      .title-row h3 {{ margin-bottom: 2px; font-size: calc(var(--type-200)); }}
+      .meta {{ color:#6b7280; font-size: calc(var(--type-100) * 0.95); margin: 4px 0 0; }}
+      .chip {{ display:inline-block; background:#eef2ff; color:#3730a3; padding:2px var(--space-2); border-radius:12px; font-size: calc(var(--type-100) * 0.9); margin-right: var(--space-2); }}
+
+      .stButton button {{ height: var(--control-h); padding: 0 var(--space-3); font-size: calc(var(--type-200)); border-radius: var(--radius); }}
+      div[data-baseweb="select"] > div {{ min-height: var(--control-h); }}
+      .stSelectbox label, .stTextInput label, .stDateInput label, .stNumberInput label {{ font-size: calc(var(--type-100)); margin-bottom: 0.2rem; }}
+      .stTextInput input, .stNumberInput input, .stDateInput input {{ height: var(--control-h); font-size: calc(var(--type-200)); }}
+      .stCheckbox label {{ font-size: calc(var(--type-200)); }}
+
+      div[data-testid="stHorizontalBlock"] > div {{ padding-right: var(--space-2); }}
+      div[data-testid="stVerticalBlock"] > div {{ margin-bottom: var(--space-3); }}
+    </style>
+    <script>
+      try {{ parent.document.documentElement.dataset.density = '{density}'.toLowerCase().replace(' ', '-'); }} catch(e) {{}}
+      try {{ localStorage.setItem('ui_density', '{density}'); }} catch(e) {{}}
+    </script>
+    """
+
+    st.markdown(css, unsafe_allow_html=True)
 
 
 def _controls(prefix: str, *, sections: List[dict], required_type: str) -> Dict:
@@ -555,12 +661,31 @@ def _render_items(
 
 
 def main() -> None:
+    # Density persistence (localStorage → query) and initial hydrate
+    _maybe_apply_density_from_query()
+    _inject_density_bootstrap()
     # Header row with density selector
-    hdr_l, hdr_r = st.columns([3, 1])
+    hdr_l, hdr_c, hdr_r = st.columns([3, 1, 1])
     with hdr_l:
         st.markdown("<h3 style='margin-bottom:0.25rem'>Plex Added Date Manager</h3>", unsafe_allow_html=True)
+    with hdr_c:
+        st.selectbox("Density", ["Comfortable", "Compact", "Ultra Compact", "Spacious"], key="ui_density")
     with hdr_r:
-        st.selectbox("Density", ["Comfortable", "Compact", "Ultra Compact"], key="ui_density")
+        if st.button("Reset All"):
+            # Reset common keys
+            for k in list(st.session_state.keys()):
+                if k.startswith('movie_') or k.startswith('show_') or k in {'ui_density'}:
+                    st.session_state.pop(k, None)
+            st.session_state['ui_density'] = 'Comfortable'
+            # Clear nav query params
+            try:
+                st.query_params.clear()
+            except Exception:
+                try:
+                    st.experimental_set_query_params()  # type: ignore[attr-defined]
+                except Exception:
+                    pass
+            st.rerun()
     _apply_density()
     _init_state()
 
@@ -580,7 +705,10 @@ def main() -> None:
     # Movies
     with tab1:
         cfg = _controls("movie", sections=sections, required_type="1")
-        _inject_sticky_filters("Movies", top_offset_px=48)
+        _inject_sticky_filters(
+            "Movies",
+            top_offset_px=56 if st.session_state.get("ui_density") == "Spacious" else (44 if st.session_state.get("ui_density") == "Compact" else 48),
+        )
         section_id = cfg["section_id"] or "1"
         type_id = "1"
 
@@ -633,7 +761,10 @@ def main() -> None:
     # Shows
     with tab2:
         cfg = _controls("show", sections=sections, required_type="2")
-        _inject_sticky_filters("TV Series", top_offset_px=48)
+        _inject_sticky_filters(
+            "TV Series",
+            top_offset_px=56 if st.session_state.get("ui_density") == "Spacious" else (44 if st.session_state.get("ui_density") == "Compact" else 48),
+        )
         section_id = cfg["section_id"] or "2"
         type_id = "2"
 
