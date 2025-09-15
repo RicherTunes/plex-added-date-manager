@@ -6,6 +6,7 @@ Highlights
 - Selection persists with batch updates and rate limiting
 - URL query params for pager navigation
 """
+
 import datetime
 import time
 from typing import Dict, List, Tuple
@@ -669,9 +670,9 @@ def _render_items(
                     st.session_state[f"{key_prefix}_range_to"] = end
         with presets[-2]:
             if st.button("Older >1y", key=f"{key_prefix}_preset_older"):
-                st.session_state[
-                    f"{key_prefix}_range_from"
-                ] = today - datetime.timedelta(days=365 * 50)
+                st.session_state[f"{key_prefix}_range_from"] = (
+                    today - datetime.timedelta(days=365 * 50)
+                )
                 st.session_state[f"{key_prefix}_range_to"] = today - datetime.timedelta(
                     days=365
                 )
@@ -790,8 +791,10 @@ def _render_items(
                     plex.update_added_date(
                         section_id, rk, type_id, new_unix, lock=lock_added
                     )
-                    st.toast(f"Saved {title}") if hasattr(st, "toast") else st.success(
-                        f"Saved {title}"
+                    (
+                        st.toast(f"Saved {title}")
+                        if hasattr(st, "toast")
+                        else st.success(f"Saved {title}")
                     )
                 except Exception as e:  # noqa: BLE001
                     st.error(f"Failed to save {title}: {e}")
@@ -895,9 +898,11 @@ def main() -> None:
         cfg = _controls("movie", sections=sections, required_type="1")
         _inject_sticky_filters(
             "Movies",
-            top_offset_px=56
-            if st.session_state.get("ui_density") == "Spacious"
-            else (44 if st.session_state.get("ui_density") == "Compact" else 48),
+            top_offset_px=(
+                56
+                if st.session_state.get("ui_density") == "Spacious"
+                else (44 if st.session_state.get("ui_density") == "Compact" else 48)
+            ),
         )
         section_id = cfg["section_id"] or "1"
         type_id = "1"
@@ -955,9 +960,11 @@ def main() -> None:
         cfg = _controls("show", sections=sections, required_type="2")
         _inject_sticky_filters(
             "TV Series",
-            top_offset_px=56
-            if st.session_state.get("ui_density") == "Spacious"
-            else (44 if st.session_state.get("ui_density") == "Compact" else 48),
+            top_offset_px=(
+                56
+                if st.session_state.get("ui_density") == "Spacious"
+                else (44 if st.session_state.get("ui_density") == "Compact" else 48)
+            ),
         )
         section_id = cfg["section_id"] or "2"
         type_id = "2"
