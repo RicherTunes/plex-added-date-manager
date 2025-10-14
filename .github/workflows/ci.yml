@@ -7,7 +7,27 @@ on:
     branches: [ main ]
 
 jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: 'pip'
+      - name: Install tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff black
+      - name: Ruff
+        run: ruff check --output-format=github .
+      - name: Black (check)
+        run: black --check .
+
   test:
+    name: Tests
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -24,11 +44,6 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest ruff black
-      - name: Lint (ruff)
-        run: ruff check --output-format=github .
-      - name: Format check (black)
-        run: black --check .
-      - name: Run tests
-        if: always()
+          pip install pytest
+      - name: Pytest
         run: pytest -q
