@@ -3,6 +3,7 @@
 These helpers are used by the Streamlit UI to present richer metadata,
 and are intentionally stdlib‑only to avoid extra dependencies.
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -91,10 +92,14 @@ def media_info(item: Mapping[str, Any]) -> Mapping[str, Optional[str]]:
         part = {}
 
     return {
-        "resolution": str(media.get("videoResolution")) if media.get("videoResolution") else None,
+        "resolution": (
+            str(media.get("videoResolution")) if media.get("videoResolution") else None
+        ),
         "videoCodec": str(media.get("videoCodec")) if media.get("videoCodec") else None,
         "audioCodec": str(media.get("audioCodec")) if media.get("audioCodec") else None,
-        "audioChannels": str(media.get("audioChannels")) if media.get("audioChannels") else None,
+        "audioChannels": (
+            str(media.get("audioChannels")) if media.get("audioChannels") else None
+        ),
         "container": str(media.get("container")) if media.get("container") else None,
         "size": human_size(part.get("size")) if part.get("size") else None,
     }

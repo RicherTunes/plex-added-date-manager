@@ -7,6 +7,7 @@ Highlights
 - URL query params for pager navigation
 - Density system centralized in `ui_density` (no duplication)
 """
+
 import datetime
 import time
 from typing import Dict, List, Tuple
@@ -21,7 +22,14 @@ from ui_density import (
     inject_density_bootstrap,
     maybe_apply_density_from_query,
 )
-from utils import brief_summary, human_duration, human_size, human_ts, list_join, media_info
+from utils import (
+    brief_summary,
+    human_duration,
+    human_size,
+    human_ts,
+    list_join,
+    media_info,
+)
 
 
 st.set_page_config(page_title="Plex Added Date Manager", layout="wide")
@@ -527,9 +535,9 @@ def _render_items(
                     st.session_state[f"{key_prefix}_range_to"] = end
         with presets[-2]:
             if st.button("Older >1y", key=f"{key_prefix}_preset_older"):
-                st.session_state[
-                    f"{key_prefix}_range_from"
-                ] = today - datetime.timedelta(days=365 * 50)
+                st.session_state[f"{key_prefix}_range_from"] = (
+                    today - datetime.timedelta(days=365 * 50)
+                )
                 st.session_state[f"{key_prefix}_range_to"] = today - datetime.timedelta(
                     days=365
                 )
@@ -648,8 +656,10 @@ def _render_items(
                     plex.update_added_date(
                         section_id, rk, type_id, new_unix, lock=lock_added
                     )
-                    st.toast(f"Saved {title}") if hasattr(st, "toast") else st.success(
-                        f"Saved {title}"
+                    (
+                        st.toast(f"Saved {title}")
+                        if hasattr(st, "toast")
+                        else st.success(f"Saved {title}")
                     )
                 except Exception as e:  # noqa: BLE001
                     st.error(f"Failed to save {title}: {e}")
@@ -685,7 +695,18 @@ def _render_items(
                     summary = brief_summary(item.get("summary"))
                     if summary:
                         st.write(summary)
-                    genres = list_join(_tags_list := [g.get("tag") for g in (item.get("Genre") or []) if isinstance(g, dict)], limit=6) if isinstance(item.get("Genre"), list) else None
+                    genres = (
+                        list_join(
+                            _tags_list := [
+                                g.get("tag")
+                                for g in (item.get("Genre") or [])
+                                if isinstance(g, dict)
+                            ],
+                            limit=6,
+                        )
+                        if isinstance(item.get("Genre"), list)
+                        else None
+                    )
                     if genres:
                         st.caption(f"Genres: {genres}")
                     studio = item.get("studio")
@@ -694,7 +715,10 @@ def _render_items(
                         st.caption(
                             " ".join(
                                 p
-                                for p in [f"Studio: {studio}" if studio else None, f"Rated: {cr}" if cr else None]
+                                for p in [
+                                    f"Studio: {studio}" if studio else None,
+                                    f"Rated: {cr}" if cr else None,
+                                ]
                                 if p
                             )
                         )
@@ -702,7 +726,15 @@ def _render_items(
                     last = human_ts(item.get("lastViewedAt"))
                     plays = item.get("viewCount")
                     guid = item.get("guid")
-                    partsz = human_size(((item.get("Media") or [{}])[0].get("Part") or [{}])[0].get("size")) if item.get("Media") else None
+                    partsz = (
+                        human_size(
+                            ((item.get("Media") or [{}])[0].get("Part") or [{}])[0].get(
+                                "size"
+                            )
+                        )
+                        if item.get("Media")
+                        else None
+                    )
                     lines = []
                     if last:
                         lines.append(f"Last viewed: {last}")
@@ -800,9 +832,11 @@ def main() -> None:
         cfg = _controls(prefix, sections=sections, required_type=type_id)
         _inject_sticky_filters(
             tab_label,
-            top_offset_px=56
-            if st.session_state.get("ui_density") == "Spacious"
-            else (44 if st.session_state.get("ui_density") == "Compact" else 48),
+            top_offset_px=(
+                56
+                if st.session_state.get("ui_density") == "Spacious"
+                else (44 if st.session_state.get("ui_density") == "Compact" else 48)
+            ),
         )
         section_id = cfg["section_id"] or ("1" if type_id == "1" else "2")
         start = (int(cfg["page"]) - 1) * int(cfg["page_size"])
@@ -826,7 +860,9 @@ def main() -> None:
         if title_filter:
             items = [i for i in items if title_filter in (i.get("title", "").lower())]
 
-        total_pages = max(1, (total + int(cfg["page_size"]) - 1) // int(cfg["page_size"]))
+        total_pages = max(
+            1, (total + int(cfg["page_size"]) - 1) // int(cfg["page_size"])
+        )
         _inject_fixed_pager(prefix, tab_label, int(cfg["page"]), int(total_pages))
         _handle_query_nav(prefix, f"{prefix}_page", int(total_pages))
         _nav(prefix, "top", cfg, total_pages, total, f"{prefix}_page")
