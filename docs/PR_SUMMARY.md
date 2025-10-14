@@ -1,4 +1,4 @@
-Title: Pagination, Batch Updates, CLI, Section Discovery, and Resilience for Large Libraries
+Title: Pagination, Batch Updates, CLI, Section Discovery, Density Refactor, and Rich Details
 
 Summary
 - Add server-side pagination to avoid UI crashes on large libraries.
@@ -10,12 +10,15 @@ Summary
 - Add CLI with rate limiting (--max-per-minute) and retries.
 - Add PowerShell wrapper for Unraid/Windows convenience.
 - Add HTTP retries/backoff for GET/PUT to handle 429/5xx.
+- Centralize density (UI spacing/typography) helpers in `src/ui_density.py` to remove duplication.
+- Add "Show details" toggle with richer item metadata (summary, genres, studio/content rating, last viewed, plays, resolution/codec, file size, runtime), when available from Plex.
 
 UI/UX Notes
 - Keep page size 100–200 for best responsiveness.
 - Toggle images off and per-item edit off to reduce widget count.
 - Use “Select all results” to operate across pages; selection persists.
 - The batch panel supports a Max/min field to limit update rate.
+- Turn on "Show details" for richer context when auditing libraries; turn off for maximum performance.
 
 CLI Quickstart
 ```bash
@@ -33,4 +36,3 @@ Breaking Changes
 
 Known Limitations
 - Very large “Select all results” can take time as it scans pages; rate limiting helps avoid server throttling.
-

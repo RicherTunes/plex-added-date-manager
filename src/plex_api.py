@@ -82,16 +82,7 @@ class PlexAPI:
             total = container.get("size", len(items))
         return items, int(total)
 
-    # Backwards compatibility helpers
-    def get_all_movies(self):
-        # default first page only to avoid massive payloads
-        items, _total = self.fetch_items("1", "1", start=0, size=100)
-        return items
-
-    def fetch_seasons(self, section_id: str):
-        # In Plex, type=2 is "show" (series). Keep prior behavior.
-        items, _total = self.fetch_items(section_id, "2", start=0, size=100)
-        return items
+    # (removed unused legacy helpers get_all_movies/fetch_seasons)
 
     # --- Update ---
     def update_added_date(

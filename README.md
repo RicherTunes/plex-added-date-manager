@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/RicherTunes/plex-added-date-manager/actions/workflows/ci.yml/badge.svg)](https://github.com/RicherTunes/plex-added-date-manager/actions/workflows/ci.yml)
 
-Streamlit (Python) app that interacts with the Plex API to fetch and manage movie data (Specifically Added Date).
+Streamlit (Python) app that interacts with the Plex API to fetch and manage movie and TV metadata focused on the Added Date. Includes a batch editor, rich item details, and a CLI for automation.
 
 <img width="1231" alt="screen" src="https://github.com/user-attachments/assets/3fae4793-9799-48d8-9715-62fc80f95601" />
 
@@ -94,7 +94,8 @@ CLI utilities:
 - Batch updates: Select multiple items (persist selections across pages), pick a date, and update all at once with progress feedback and optional metadata lock.
 - Section discovery: Section selector is auto-populated from your Plex server (Movies vs Shows).
 - Select all results: With current filters applied, select items across all pages; also includes "Clear all".
-- QoL toggles: Show/hide images and enable/disable per-item edit controls to keep the UI light.
+- QoL toggles: Show/hide images, toggle rich details, and enable/disable per-item edit controls to keep the UI light.
+- Rich item details: When enabled, each card shows summary, genres, studio/rating, last viewed date, play count, resolution/codec, file size, and runtime (when available from Plex).
 
 Notes:
 - Movies use section id default `1`, shows use default `2`. Adjust in the UI if yours differ.
@@ -110,10 +111,10 @@ Notes:
 - Settings: Use the Settings link in the header to open the panel and toggle the pointer-aware default, or click Reset density only to return to Comfortable and clear the saved density.
 - Modes: Ultra Compact, Compact, Comfortable, Spacious.
 - Persistence: remembers your last density; new sessions default to Spacious on touch, Comfortable otherwise (configurable).
+- Centralized: Density bootstrap and CSS are now in `src/ui_density.py` (no duplication).
 - Reset All: restores defaults and clears nav query params.
 
 ## License
 
 This project is licensed under the MIT License. See the LICENSE file for more details.
-
 
