@@ -5,6 +5,7 @@ Highlights
 - Lightweight per-page title filter
 - Selection persists with batch updates and rate limiting
 - URL query params for pager navigation
+- Density system centralized in `ui_density` (no duplication)
 """
 import datetime
 import time
@@ -15,68 +16,15 @@ import streamlit as st
 from plex_api import PlexAPI
 from streamlit import components
 from string import Template
+from ui_density import (
+    apply_density,
+    inject_density_bootstrap,
+    maybe_apply_density_from_query,
+)
+from utils import brief_summary, human_duration, human_size, human_ts, list_join, media_info
 
 
 st.set_page_config(page_title="Plex Added Date Manager", layout="wide")
-
-
-def _maybe_apply_density_from_query() -> None:
-    try:
-        qp = dict(st.query_params)
-    except Exception:
-        try:
-            qp = st.experimental_get_query_params()  # type: ignore[attr-defined]
-        except Exception:
-            qp = {}
-    if not qp:
-        return
-    raw = qp.get("ui_density")
-    valid = {"Ultra Compact", "Compact", "Comfortable", "Spacious"}
-    val = raw[0] if isinstance(raw, list) else raw
-    if val and val in valid:
-        st.session_state["ui_density"] = val
-        try:
-            st.query_params.clear()
-            for k, v in qp.items():
-                if k == "ui_density":
-                    continue
-                st.query_params[k] = v
-        except Exception:
-            try:
-                qp2 = {
-                    k: (v[0] if isinstance(v, list) else v)
-                    for k, v in qp.items()
-                    if k != "ui_density"
-                }
-                st.experimental_set_query_params(**qp2)  # type: ignore[attr-defined]
-            except Exception:
-                pass
-
-
-def _inject_density_bootstrap() -> None:
-    cur = st.session_state.get("ui_density", "Comfortable")
-    html = f"""
-    <script>
-      (function(){{
-        try {{
-          const serverDensity = {cur!r};
-          const bootKey = 'ui_density_boot';
-          const ls = localStorage.getItem('ui_density');
-          const booted = sessionStorage.getItem(bootKey);
-          if (ls && !booted && ls !== serverDensity) {{
-            const url = new URL(parent.location);
-            url.searchParams.set('ui_density', ls);
-            sessionStorage.setItem(bootKey, '1');
-            parent.location.replace(url.toString());
-          }}
-        }} catch(e){{}}
-      }})();
-    </script>
-    """
-    try:
-        components.v1.html(html, height=0)  # type: ignore[attr-defined]
-    except Exception:
-        pass
 
 
 # Lightweight styling
@@ -337,102 +285,7 @@ def _init_state() -> None:
         st.session_state.setdefault(k, v)
 
 
-def _apply_density() -> None:
-    """Apply global, density-aware CSS tokens for the whole UI.
-
-    Scales spacing, control sizes, typography, and chrome consistently.
-    Keeps legacy values working for "Ultra Compact".
-    """
-    density = st.session_state.get("ui_density", "Comfortable")
-
-    if density not in {"Ultra Compact", "Compact", "Comfortable", "Spacious"}:
-        density = "Comfortable"
-
-    tokens = {
-        "Ultra Compact": {
-            "scale": 0.8,
-            "control_h": 28,
-            "nav_h": 40,
-            "icon": 14,
-            "radius": 6,
-        },
-        "Compact": {
-            "scale": 0.9,
-            "control_h": 32,
-            "nav_h": 44,
-            "icon": 16,
-            "radius": 7,
-        },
-        "Comfortable": {
-            "scale": 1.0,
-            "control_h": 36,
-            "nav_h": 48,
-            "icon": 16,
-            "radius": 8,
-        },
-        "Spacious": {
-            "scale": 1.15,
-            "control_h": 44,
-            "nav_h": 56,
-            "icon": 18,
-            "radius": 10,
-        },
-    }[density]
-
-    scale = tokens["scale"]
-    control_h = tokens["control_h"]
-    nav_h = tokens["nav_h"]
-    icon = tokens["icon"]
-    radius = tokens["radius"]
-
-    s1 = int(round(4 * scale))
-    s2 = int(round(8 * scale))
-    s3 = int(round(12 * scale))
-    s4 = int(round(16 * scale))
-
-    t100 = max(12, int(round(12 * scale)))
-    t200 = max(13, int(round(14 * scale)))
-
-    css = f"""
-    <style>
-      :root {{
-        --density: '{density}';
-        --scale: {scale};
-        --space-1: {s1}px;
-        --space-2: {s2}px;
-        --space-3: {s3}px;
-        --space-4: {s4}px;
-        --radius: {radius}px;
-        --control-h: {control_h}px;
-        --icon: {icon}px;
-        --nav-h: {nav_h}px;
-        --type-100: {t100}px;
-        --type-200: {t200}px;
-      }}
-
-      .block-container {{ padding-top: calc(var(--nav-h) + var(--space-2)); }}
-      [data-testid="stHeader"] {{ height: var(--nav-h) !important; }}
-
-      .title-row h3 {{ margin-bottom: 2px; font-size: calc(var(--type-200)); }}
-      .meta {{ color:#6b7280; font-size: calc(var(--type-100) * 0.95); margin: 4px 0 0; }}
-      .chip {{ display:inline-block; background:#eef2ff; color:#3730a3; padding:2px var(--space-2); border-radius:12px; font-size: calc(var(--type-100) * 0.9); margin-right: var(--space-2); }}
-
-      .stButton button {{ height: var(--control-h); padding: 0 var(--space-3); font-size: calc(var(--type-200)); border-radius: var(--radius); }}
-      div[data-baseweb="select"] > div {{ min-height: var(--control-h); }}
-      .stSelectbox label, .stTextInput label, .stDateInput label, .stNumberInput label {{ font-size: calc(var(--type-100)); margin-bottom: 0.2rem; }}
-      .stTextInput input, .stNumberInput input, .stDateInput input {{ height: var(--control-h); font-size: calc(var(--type-200)); }}
-      .stCheckbox label {{ font-size: calc(var(--type-200)); }}
-
-      div[data-testid="stHorizontalBlock"] > div {{ padding-right: var(--space-2); }}
-      div[data-testid="stVerticalBlock"] > div {{ margin-bottom: var(--space-3); }}
-    </style>
-    <script>
-      try {{ parent.document.documentElement.dataset.density = '{density}'.toLowerCase().replace(' ', '-'); }} catch(e) {{}}
-      try {{ localStorage.setItem('ui_density', '{density}'); }} catch(e) {{}}
-    </script>
-    """
-
-    st.markdown(css, unsafe_allow_html=True)
+# Density CSS is now handled by ui_density.apply_density()
 
 
 def _controls(prefix: str, *, sections: List[dict], required_type: str) -> Dict:
@@ -443,6 +296,7 @@ def _controls(prefix: str, *, sections: List[dict], required_type: str) -> Dict:
     year_key = f"{prefix}_year_filter"
     title_key = f"{prefix}_title_filter"
     images_key = f"{prefix}_show_images"
+    details_key = f"{prefix}_show_details"
     lock_key = f"{prefix}_lock_added"
 
     # Section dropdown (filtered by type)
@@ -493,7 +347,7 @@ def _controls(prefix: str, *, sections: List[dict], required_type: str) -> Dict:
     with r1c6:
         st.checkbox("Show images", key=images_key)
 
-    r2c1, r2c2, r2c3 = st.columns([1, 1, 3])
+    r2c1, r2c2, r2c3, r2c4 = st.columns([1, 1, 3, 1.2])
     with r2c1:
         st.checkbox("Lock added date", key=lock_key)
     with r2c2:
@@ -504,6 +358,8 @@ def _controls(prefix: str, *, sections: List[dict], required_type: str) -> Dict:
             st.session_state[page_key] = 1
     with r2c3:
         st.caption("Tip: Use the pager to jump to any page.")
+    with r2c4:
+        st.checkbox("Show details", key=details_key)
 
     return {
         "section_id": st.session_state[section_key],
@@ -513,6 +369,7 @@ def _controls(prefix: str, *, sections: List[dict], required_type: str) -> Dict:
         "year": st.session_state[year_key],
         "title": st.session_state[title_key],
         "show_images": st.session_state[images_key],
+        "show_details": st.session_state.get(details_key, False),
         "lock": st.session_state[lock_key],
     }
 
@@ -525,6 +382,7 @@ def _render_items(
     select_key: str,
     key_prefix: str,
     show_images: bool,
+    show_details: bool,
     lock_added: bool,
     section_id: str,
     sort: str,
@@ -804,16 +662,64 @@ def _render_items(
             )
 
             # Secondary info chips
+            chips = [f"Release {rel}", f"ID {rating_key}"]
+            # Add a few more quick chips when available
+            info = media_info(item)
+            if info.get("resolution"):
+                chips.append(f"{info['resolution']}p")
+            if info.get("size"):
+                chips.append(f"{info['size']}")
+            if item.get("duration"):
+                dur = human_duration(int(item.get("duration") or 0))
+                if dur:
+                    chips.append(dur)
             st.markdown(
-                f"<span class='chip'>Release {rel}</span> <span class='chip'>ID {rating_key}</span>",
+                " ".join(f"<span class='chip'>{c}</span>" for c in chips),
                 unsafe_allow_html=True,
             )
+
+            if show_details:
+                # Structured details panel (compact)
+                meta_left, meta_right = st.columns([2, 3])
+                with meta_left:
+                    summary = brief_summary(item.get("summary"))
+                    if summary:
+                        st.write(summary)
+                    genres = list_join(_tags_list := [g.get("tag") for g in (item.get("Genre") or []) if isinstance(g, dict)], limit=6) if isinstance(item.get("Genre"), list) else None
+                    if genres:
+                        st.caption(f"Genres: {genres}")
+                    studio = item.get("studio")
+                    cr = item.get("contentRating")
+                    if studio or cr:
+                        st.caption(
+                            " ".join(
+                                p
+                                for p in [f"Studio: {studio}" if studio else None, f"Rated: {cr}" if cr else None]
+                                if p
+                            )
+                        )
+                with meta_right:
+                    last = human_ts(item.get("lastViewedAt"))
+                    plays = item.get("viewCount")
+                    guid = item.get("guid")
+                    partsz = human_size(((item.get("Media") or [{}])[0].get("Part") or [{}])[0].get("size")) if item.get("Media") else None
+                    lines = []
+                    if last:
+                        lines.append(f"Last viewed: {last}")
+                    if plays:
+                        lines.append(f"Plays: {plays}")
+                    if guid:
+                        lines.append(f"GUID: {guid}")
+                    if partsz:
+                        lines.append(f"File: {partsz}")
+                    if lines:
+                        st.caption(" | ".join(lines))
 
 
 def main() -> None:
     # Density persistence (localStorage → query) and initial hydrate
-    _maybe_apply_density_from_query()
-    _inject_density_bootstrap()
+    maybe_apply_density_from_query()
+    inject_density_bootstrap()
     # Header row with density selector and Settings link
     hdr_l, hdr_c, hdr_r, hdr_s = st.columns([3, 1, 1, 1])
     with hdr_l:
@@ -874,7 +780,7 @@ def main() -> None:
             except Exception:
                 pass
             _safe_rerun()
-    _apply_density()
+    apply_density()
     _init_state()
 
     plex = PlexAPI()
@@ -890,18 +796,15 @@ def main() -> None:
 
     tab1, tab2 = st.tabs(["Movies", "TV Series"])  # TV Series == shows (type=2)
 
-    # Movies
-    with tab1:
-        cfg = _controls("movie", sections=sections, required_type="1")
+    def render_tab(tab_label: str, prefix: str, type_id: str) -> None:
+        cfg = _controls(prefix, sections=sections, required_type=type_id)
         _inject_sticky_filters(
-            "Movies",
+            tab_label,
             top_offset_px=56
             if st.session_state.get("ui_density") == "Spacious"
             else (44 if st.session_state.get("ui_density") == "Compact" else 48),
         )
-        section_id = cfg["section_id"] or "1"
-        type_id = "1"
-
+        section_id = cfg["section_id"] or ("1" if type_id == "1" else "2")
         start = (int(cfg["page"]) - 1) * int(cfg["page_size"])
         try:
             items, total = _cached_fetch(
@@ -923,21 +826,20 @@ def main() -> None:
         if title_filter:
             items = [i for i in items if title_filter in (i.get("title", "").lower())]
 
-        total_pages = max(
-            1, (total + int(cfg["page_size"]) - 1) // int(cfg["page_size"])
-        )
-        _inject_fixed_pager("movie", "Movies", int(cfg["page"]), int(total_pages))
-        _handle_query_nav("movie", "movie_page", int(total_pages))
-        _nav("movie", "top", cfg, total_pages, total, "movie_page")
+        total_pages = max(1, (total + int(cfg["page_size"]) - 1) // int(cfg["page_size"]))
+        _inject_fixed_pager(prefix, tab_label, int(cfg["page"]), int(total_pages))
+        _handle_query_nav(prefix, f"{prefix}_page", int(total_pages))
+        _nav(prefix, "top", cfg, total_pages, total, f"{prefix}_page")
 
         if items:
             _render_items(
                 plex,
                 items,
                 type_id=type_id,
-                select_key="movie_selected",
-                key_prefix="movie",
+                select_key=f"{prefix}_selected",
+                key_prefix=prefix,
                 show_images=cfg["show_images"],
+                show_details=cfg.get("show_details", False),
                 lock_added=cfg["lock"],
                 section_id=section_id,
                 sort=cfg["sort"],
@@ -946,68 +848,14 @@ def main() -> None:
                 page_size=int(cfg["page_size"]),
             )
         else:
-            st.info("No movies found for current filters.")
+            st.info(f"No {tab_label.lower()} found for current filters.")
 
-        _nav("movie", "bottom", cfg, total_pages, total, "movie_page")
+        _nav(prefix, "bottom", cfg, total_pages, total, f"{prefix}_page")
 
-    # Shows
+    with tab1:
+        render_tab("Movies", "movie", "1")
     with tab2:
-        cfg = _controls("show", sections=sections, required_type="2")
-        _inject_sticky_filters(
-            "TV Series",
-            top_offset_px=56
-            if st.session_state.get("ui_density") == "Spacious"
-            else (44 if st.session_state.get("ui_density") == "Compact" else 48),
-        )
-        section_id = cfg["section_id"] or "2"
-        type_id = "2"
-
-        start = (int(cfg["page"]) - 1) * int(cfg["page_size"])
-        try:
-            items, total = _cached_fetch(
-                plex.base_url,
-                plex.token,
-                section_id,
-                type_id,
-                start,
-                int(cfg["page_size"]),
-                cfg["sort"],
-                cfg["year"] or "",
-            )
-        except Exception as e:
-            st.error(f"Failed to fetch items for section {section_id}: {e}")
-            items, total = [], 0
-
-        title_filter = (cfg["title"] or "").strip().lower()
-        if title_filter:
-            items = [i for i in items if title_filter in (i.get("title", "").lower())]
-
-        total_pages = max(
-            1, (total + int(cfg["page_size"]) - 1) // int(cfg["page_size"])
-        )
-        _inject_fixed_pager("show", "TV Series", int(cfg["page"]), int(total_pages))
-        _handle_query_nav("show", "show_page", int(total_pages))
-        _nav("show", "top", cfg, total_pages, total, "show_page")
-
-        if items:
-            _render_items(
-                plex,
-                items,
-                type_id=type_id,
-                select_key="show_selected",
-                key_prefix="show",
-                show_images=cfg["show_images"],
-                lock_added=cfg["lock"],
-                section_id=section_id,
-                sort=cfg["sort"],
-                year=cfg["year"] or "",
-                title_filter=title_filter,
-                page_size=int(cfg["page_size"]),
-            )
-        else:
-            st.info("No shows found for current filters.")
-
-        _nav("show", "bottom", cfg, total_pages, total, "show_page")
+        render_tab("TV Series", "show", "2")
 
 
 def _inject_sticky_filters(tab_label: str, top_offset_px: int = 48) -> None:
