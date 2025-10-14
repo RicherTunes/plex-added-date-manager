@@ -27,7 +27,7 @@ jobs:
         run: black --check .
 
   test:
-    name: Tests
+    name: test
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
