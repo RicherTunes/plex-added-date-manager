@@ -1013,6 +1013,79 @@ def main():
             chosen = st.selectbox("Music Library", options=labels, key="music_section_label")
             section_id = label_to_key[chosen]
 
+            # ── Sync dates from files ──
+            with st.expander("🧠 Smart Sync — set addedAt from file dates (birthtime → mtime)", expanded=False):
+                st.caption("Fija el `addedAt` de cada **track** a la fecha de creación del archivo (birthtime, fallback mtime). Álbumes → fecha del track más reciente; Artistas → fecha del álbum más reciente. Siempre dry-run primero.")
+                if "sync_running" not in st.session_state:
+                    st.session_state["sync_running"] = False
+                if "sync_plan" not in st.session_state:
+                    st.session_state["sync_plan"] = None
+                if not st.session_state["sync_running"] and st.session_state["sync_plan"] is None:
+                    if st.button("Preview changes (dry-run)", key="sync_preview"):
+                        st.session_state["sync_running"] = True
+                        st.session_state["sync_phase"] = "starting"
+                        st.session_state["sync_progress"] = (0, 1)
+                        _safe_rerun()
+                if st.session_state["sync_running"]:
+                    import threading
+                    progress = st.progress(0, text="Scanning files...")
+                    def _sync_bg():
+                        def _cb(phase, current, total):
+                            st.session_state["sync_phase"] = phase
+                            st.session_state["sync_progress"] = (current, total)
+                        try:
+                            plan = plex.sync_dates_from_files(section_id, progress_callback=_cb)
+                            st.session_state["sync_plan"] = plan
+                        except Exception as e:
+                            st.session_state["sync_error"] = str(e)
+                        finally:
+                            st.session_state["sync_running"] = False
+                    phase = st.session_state.get("sync_phase", "starting")
+                    current, total = st.session_state.get("sync_progress", (0, 1))
+                    pct = min(100, int(current * 100 / max(1, total)))
+                    progress.progress(pct, text=f"{phase}: {current}/{total}")
+                    if not st.session_state.get("sync_thread_started"):
+                        st.session_state["sync_thread_started"] = True
+                        t = threading.Thread(target=_sync_bg, daemon=True)
+                        t.start()
+                    else:
+                        _safe_rerun()
+                    sync_error = st.session_state.pop("sync_error", None)
+                    if sync_error:
+                        st.error(f"Sync failed: {sync_error}")
+                        st.session_state["sync_thread_started"] = False
+                plan = st.session_state.get("sync_plan")
+                if plan:
+                    st.session_state["sync_thread_started"] = False
+                    stats = plan["stats"]
+                    st.markdown(f"**{stats['tracks_updated']}** tracks to update, **{stats['albums_updated']}** albums, **{stats['artists_updated']}** artists")
+                    st.caption(f"{stats['tracks_skipped']} tracks already correct, {stats['tracks_no_file']} tracks without file path")
+                    if plan["tracks"]:
+                        with st.expander(f"Track details ({len(plan['tracks'])})", expanded=False):
+                            for t in plan["tracks"][:50]:
+                                old_dt = datetime.datetime.fromtimestamp(t["old_date"]).strftime("%Y-%m-%d") if t["old_date"] else "?"
+                                new_dt = datetime.datetime.fromtimestamp(t["new_date"]).strftime("%Y-%m-%d") if t["new_date"] else "?"
+                                st.write(f"**{t['title']}** — {old_dt} → {new_dt} ({t['source']})")
+                            if len(plan["tracks"]) > 50:
+                                st.caption(f"... and {len(plan['tracks']) - 50} more")
+                    c1, c2 = st.columns([1,1])
+                    with c1:
+                        rate_limit = st.number_input("Max/min (0=unlimited)", min_value=0, value=0, step=30, key="sync_rate")
+                    with c2:
+                        if st.button("Apply changes", key="sync_apply", disabled=stats["tracks_updated"] == 0):
+                            progress = st.progress(0, text="Applying...")
+                            def _apply_progress(phase, current, total):
+                                pct = min(100, int(current * 100 / max(1, total)))
+                                progress.progress(pct, text=f"{phase}: {current}/{total}")
+                            result = plex.apply_sync_plan(section_id, plan, rate_limit=rate_limit, progress_callback=_apply_progress)
+                            progress.progress(100, text="Done")
+                            st.success(f"Updated {result['updated']}/{result['total']} items ({result['errors']} errors)")
+                            del st.session_state["sync_plan"]
+                            _safe_rerun()
+                        if st.button("Clear preview", key="sync_clear"):
+                            del st.session_state["sync_plan"]
+                            _safe_rerun()
+
             view = st.session_state.get("music_view", "artists")
             artist_name = st.session_state.get("music_artist_name", "")
             album_name = st.session_state.get("music_album_name", "")
