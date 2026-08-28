@@ -34,9 +34,9 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     )
     p.add_argument(
         "--type",
-        choices=["movie", "show", "1", "2"],
+        choices=["movie", "show", "artist", "album", "track", "1", "2", "8", "9", "10"],
         default="movie",
-        help="Item type: movie (1) or show (2)",
+        help="Item type: movie (1), show (2), artist (8), album (9), or track (10)",
     )
     p.add_argument("--date", help="New date in YYYY-MM-DD format")
     p.add_argument("--year", help="Filter by year (server-side)")
@@ -68,6 +68,11 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     p.add_argument("--token", help="Override PLEX_TOKEN")
     p.add_argument(
         "--dry-run", action="store_true", help="Print planned changes without applying"
+    )
+    p.add_argument(
+        "--sync-from-files",
+        action="store_true",
+        help="Sync addedAt dates from file birthtime/mtime (music only).",
     )
 
     return p.parse_args(argv)
@@ -145,7 +150,41 @@ def main(argv: Optional[List[str]] = None) -> int:
             print(f"{s['key']}\t{s.get('type','')}\t{s.get('title','')}")
         return 0
 
-    type_id = "1" if args.type in {"movie", "1"} else "2"
+    type_id_map = {"movie": "1", "show": "2", "artist": "8", "album": "9", "track": "10"}
+    type_id = type_id_map.get(args.type, args.type)
+
+    # ── Sync from files mode ──
+    if args.sync_from_files:
+        if not args.section_id:
+            print("--section-id is required for --sync-from-files", file=sys.stderr)
+            return 2
+        plex = PlexAPI(base_url=base_url, token=token)
+        print("Scanning files...")
+        def cli_progress(phase, current, total):
+            pct = int(current * 100 / max(1, total))
+            print(f"  {phase}: {current}/{total} ({pct}%)", end="\r")
+        plan = plex.sync_dates_from_files(args.section_id, progress_callback=cli_progress)
+        stats = plan["stats"]
+        print(f"\n{'DRY RUN' if args.dry_run else 'PLAN'}:")
+        print(f"  Tracks:   {stats['tracks_updated']} to update, {stats['tracks_skipped']} OK, {stats['tracks_no_file']} no file")
+        print(f"  Albums:   {stats['albums_updated']} to update")
+        print(f"  Artists:  {stats['artists_updated']} to update")
+        if not args.dry_run and (stats["tracks_updated"] or stats["albums_updated"] or stats["artists_updated"]):
+            rate_limit = int(args.max_per_minute) if args.max_per_minute else 0
+            result = plex.apply_sync_plan(args.section_id, plan, rate_limit=rate_limit, progress_callback=cli_progress)
+            print(f"\nDone. Updated {result['updated']}/{result['total']} items ({result['errors']} errors)")
+        elif args.dry_run and plan["tracks"]:
+            print("\nSample track changes:")
+            for t in plan["tracks"][:10]:
+                old_dt = datetime.datetime.fromtimestamp(t["old_date"]).strftime("%Y-%m-%d") if t["old_date"] else "?"
+                new_dt = datetime.datetime.fromtimestamp(t["new_date"]).strftime("%Y-%m-%d") if t["new_date"] else "?"
+                print(f"  {t['title']}: {old_dt} → {new_dt} ({t['source']})")
+            if len(plan["tracks"]) > 10:
+                print(f"  ... and {len(plan['tracks']) - 10} more")
+        else:
+            print("\nNothing to update.")
+        return 0
+
     if not args.section_id or not args.date:
         print(
             "--section-id and --date are required for updates (omit them only with --list-sections)",
