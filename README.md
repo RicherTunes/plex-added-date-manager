@@ -2,7 +2,19 @@
 
 [![CI](https://github.com/RicherTunes/plex-added-date-manager/actions/workflows/ci.yml/badge.svg)](https://github.com/RicherTunes/plex-added-date-manager/actions/workflows/ci.yml)
 
-Streamlit (Python) app that interacts with the Plex API to manage added dates for Movies, TV Shows, and Music (Artists, Albums, Tracks).
+Streamlit (Python) app that interacts with the Plex API to manage `addedAt` dates for **Movies, TV Shows, and Music (Artists, Albums, Tracks)** — with a clean 4-zone UI (Filters → Display → Results → Actions) and a **Smart Sync** that sets dates from file creation time.
+
+## Screenshots
+
+| Movies — Filters & Actions | Music — Artists |
+|---|---|
+| ![Movies](docs/screenshots/01-movies-filters-actions.png) | ![Music Artists](docs/screenshots/02-music-artists.png) |
+
+| Music — Smart Sync | TV Series |
+|---|---|
+| ![Smart Sync](docs/screenshots/03-music-smart-sync.png) | ![TV](docs/screenshots/04-tv-series.png) |
+
+> Screenshots are full-page captures from `http://192.168.1.153:8501` (Streamlit `layout="wide"`).
 
 ## Setup
 
@@ -32,92 +44,98 @@ Open `http://localhost:8501` in your browser.
 
 ### What you can do
 
-- **Movies & TV Shows**: Browse your libraries, filter by year/title, sort by added date or title, edit dates individually or in batch.
-- **Music**: Browse Artists → Albums → Tracks with the same controls. Navigate with breadcrumbs (`← Artist Name` to go back).
-- **Batch updates**: Select multiple items (across pages), pick a date, and update all at once with progress feedback.
-- **Date range selection** (Movies/TV): Filter by preset ranges (Last 7/30/90/365 days, This Year, Older >1y) or set a custom date range.
-- **Per-item auto-save**: Change a date and it saves immediately — no need to click a save button.
+- **Movies & TV Shows**: Browse libraries, filter, sort, edit dates individually or in batch. TV preserves the compound action (season metadata + all child episodes).
+- **Music**: Browse **Artists → Albums → Tracks** with breadcrumbs (`← Artist Name`). Same filters/sorts as Movies, plus hierarchical navigation.
+- **Batch updates**: Select across pages (checkboxes), pick a date, apply with progress and rate-limiting.
+- **Date range selection**: Presets (Last 7/30/90/365, This Year, Older >1y) + custom From/To → Select/Deselect range.
+- **Per-item auto-save**: Change a date via the inline `Added` picker and it saves immediately (`addedAt.locked=1` if Lock is on).
+- **Smart Sync (Music)**: Sets each track's `addedAt` to the file's **birthtime** (fallback `mtime`). Albums → most recent track date; Artists → most recent album date. Always **dry-run (Preview)** first, then Apply.
 
-### UI controls
+### UI layout — 4 zones
 
-| Control | What it does |
-|---------|-------------|
-| **Page Size** | 50, 100, or 200 items per page |
-| **Sort** | By added date or title (ascending/descending) |
-| **Title contains** | Filter items by name (client-side) |
-| **Year** | Filter by year (server-side, Movies/TV only) |
-| **Lock added date** | Prevent Plex from overwriting the date on next scan |
-| **Show images** | Toggle thumbnail visibility |
-| **Show details** | Show resolution, file size, duration, genres, etc. |
-| **Reset Filters** | Clear all filters and return to defaults |
-| **Go to page** | Jump directly to any page |
+Every tab (Movies, TV, Artists, Albums, Tracks) shares the same visual structure:
+
+| Zone | Color | Contains |
+|---|---|---|
+| **🔍 Filters** | blue | Section, Page Size, Sort, Year (server-side), Title contains |
+| **⚙️ Display Options** | purple | Show images, Show details, Lock added date |
+| **📋 Results Toolbar** | amber | Pagination (Prev/Next, Go to page), **N selected**, **Jump to Actions ▸** |
+| **⚡ Actions** | red | Selection (Select page / Select all results / Clear), Batch date, Max/min, **Apply to N selected**, Date range presets, **Smart Sync** (Music only) |
+
+`Jump to Actions ▸` in the toolbar scrolls smoothly to `⚡ Actions` (`id="actions-panel"`) so controls are always reachable on long lists.
 
 ### Batch operations
 
-1. Check individual items or use **Select all on page** / **Select all results**
-2. Pick a date in the **Batch date** picker
-3. Optionally set a rate limit (**Max/min**) to avoid overwhelming Plex
-4. Click **Apply to selected**
+1. Check items or use **Select all on page** / **Select all results** (or **Select by Added date range**)
+2. Pick **Batch date**
+3. Optional **Max/min** rate limit
+4. **Apply to selected** → progress bar + retry with backoff
+
+### Smart Sync — Music dates from files
+
+In the **Music** tab, after picking a library (e.g., `Música (#11)`):
+
+1. Open `🧠 Smart Sync — set addedAt from file dates (birthtime → mtime)` (collapsed by default)
+2. **Preview changes (dry-run)** → scans all tracks (`/library/sections/{id}/all?type=10`), reads `Media.Part.file`, stats each file (`st_birthtime` → `st_mtime`), builds plan for tracks/albums/artists, shows `X tracks, Y albums, Z artists` + sample 50 rows
+3. Set **Max/min** if needed, then **Apply changes** → updates Plex via `PUT /library/sections/{id}/all` with `addedAt.value` + `addedAt.locked`
+
+> Tip: The scan is synchronous with a progress bar (`fetching_tracks`, `reading_files`). For 4–5k tracks expect ~5–15s on local disk; slower on network mounts.
 
 ## CLI Batch Mode
 
-Run without the UI to update many items efficiently.
-
 ```bash
-# Dry run: update all movies (section 1) from 2023 to have addedAt 2024-01-15
+# Movies: dry run
 python src/cli.py --section-id 1 --type movie --year 2023 --date 2024-01-15 --dry-run
 
-# Apply with lock and throttle 0.1s per item
+# Apply with throttle
 python src/cli.py --section-id 1 --type movie --year 2023 --date 2024-01-15 --sleep 0.1
 
-# Rate limit to at most 120 updates/minute
+# Rate limit 120/min
 python src/cli.py --section-id 1 --type movie --year 2023 --date 2024-01-15 --max-per-minute 120
 
-# Filter by title
+# Filter by title / specific IDs
 python src/cli.py --section-id 1 --type movie --title-contains batman --date 2022-10-01
-
-# Update specific items by ID
 python src/cli.py --section-id 1 --type movie --ids 12345 67890 --date 2021-06-01
 
-# Music: update all tracks in an album
+# Music
 python src/cli.py --section-id 11 --type track --date 2024-01-15
-
-# List all library sections
-python src/cli.py --list-sections
-
-# List only music sections
 python src/cli.py --list-sections --sections-type artist
+
+# Smart Sync — music dates from files (dry-run first, then apply)
+python src/cli.py --section-id 11 --sync-from-files --dry-run
+python src/cli.py --section-id 11 --sync-from-files --max-per-minute 60
 ```
 
 ### CLI flags
 
 | Flag | Description |
 |------|-------------|
-| `--section-id` | Plex library section ID (required). Movies often `1`, Shows `2`, Music `11`. |
+| `--section-id` | Plex section ID (required). Movies often `1`/`5`, Shows `2`/`8`, Music `11`. |
 | `--type` | `movie`/`1`, `show`/`2`, `artist`/`8`, `album`/`9`, `track`/`10` |
-| `--date` | New date in `YYYY-MM-DD` format (required) |
+| `--date` | New date `YYYY-MM-DD` (required unless `--sync-from-files` or `--list-sections`) |
 | `--year` | Filter by year (server-side) |
 | `--title-contains` | Filter by title (client-side) |
-| `--ids` | Update only these ratingKeys |
+| `--ids` | Only these ratingKeys |
 | `--page-size` | Fetch page size (default 200) |
 | `--max-items` | Stop after N updates |
 | `--sleep` | Seconds between updates |
-| `--max-per-minute` | Rate limit; auto-calculates sleep |
+| `--max-per-minute` | Rate limit |
 | `--no-lock` | Do not lock `addedAt` after update |
 | `--dry-run` | Show planned changes only |
-| `--base-url` | Override `PLEX_BASE_URL` |
-| `--token` | Override `PLEX_TOKEN` |
-| `--list-sections` | Print key, type, and title for all libraries |
-| `--sections-type` | Filter list by type: `movie`, `show`, `artist`, `photo`, `mixed` |
+| `--sync-from-files` | **Music only:** set `addedAt` from file birthtime/mtime (dry-run first) |
+| `--base-url` / `--token` | Override `PLEX_BASE_URL` / `PLEX_TOKEN` |
+| `--list-sections` | Print key, type, title for all libraries |
+| `--sections-type` | Filter list by type |
 
-The CLI retries failed updates up to 3 times with exponential backoff.
+Retries failed updates 3× with exponential backoff; respects `Retry` on 429/5xx.
 
 ## Known Limitations
 
-- Rendering hundreds of widgets with images on a single page can feel heavy. Use page sizes of 50–200 and disable images for large libraries.
-- Lists are not virtualized; pagination is the workaround.
-- Music: Year filter is not available for Artists (no year field). Album year is displayed but not filterable server-side.
-- Batch updates send one request per item. For very large batches, consider smaller chunks or CLI mode.
+- Rendering hundreds of image widgets per page is heavy. Use 50–100 per page and toggle images for large libraries.
+- Lists are paginated, not virtualized.
+- Music: Year filter not available for Artists (no year field).
+- Batch/Sync sends one `PUT` per item. For very large batches use CLI with rate limiting.
+- `birthtime` availability depends on filesystem/OS; fallback is `mtime`.
 
 ## License
 
