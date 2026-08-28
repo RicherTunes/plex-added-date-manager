@@ -447,9 +447,11 @@ def _render_music_artists(plex: PlexAPI, section_id: str):
     total_pages = max(1, (total + page_size - 1) // page_size)
     selected: Dict[str, bool] = st.session_state.setdefault("music_artist_selected", {})
 
-    # ── Batch controls ──
-    left, mid, right = st.columns([2, 3, 2])
-    with left:
+    # ═══ Modify dates ═══
+    st.markdown("#### Modify dates")
+
+    sel1, sel2, sel3 = st.columns([2, 3, 2])
+    with sel1:
         page_select_all = st.checkbox("Select all on page", key="music_artist_sel_all_page")
         b1, b2 = st.columns(2)
         with b1:
@@ -474,33 +476,97 @@ def _render_music_artists(plex: PlexAPI, section_id: str):
             if st.button("Clear all", key="music_artist_clear"):
                 selected.clear()
                 st.success("Cleared.")
-    with mid:
+    with sel2:
         batch_date = st.date_input("Batch date", value=datetime.date.today(), key="music_artist_batch_date")
         max_per_min = st.number_input("Max/min (0=unlimited)", min_value=0, value=0, step=30, key="music_artist_rate")
-    with right:
-        if st.button("Apply to selected", key="music_artist_apply"):
+    with sel3:
+        total_sel = sum(1 for v in selected.values() if v)
+        st.caption(f"**{total_sel}** selected")
+        if st.button("Apply to selected", key="music_artist_apply", disabled=total_sel == 0):
             keys = [k for k, v in selected.items() if v]
-            if not keys:
-                st.warning("No items selected.")
-            else:
-                new_unix = int(datetime.datetime.combine(batch_date, datetime.time.min).timestamp())
-                per_item_sleep = (60.0 / max_per_min) if max_per_min > 0 else 0.0
-                progress = st.progress(0)
-                ok = 0
-                for idx, rk in enumerate(keys, 1):
-                    try:
-                        plex.update_added_date(section_id, rk, "8", new_unix, lock=lock)
-                        ok += 1
-                    except Exception as e:
-                        st.error(f"Failed id={rk}: {e}")
-                    progress.progress(int(idx * 100 / max(1, len(keys))))
-                    if per_item_sleep:
-                        time.sleep(per_item_sleep)
-                st.success(f"Updated {ok}/{len(keys)} artists.")
+            new_unix = int(datetime.datetime.combine(batch_date, datetime.time.min).timestamp())
+            per_item_sleep = (60.0 / max_per_min) if max_per_min > 0 else 0.0
+            progress = st.progress(0)
+            ok = 0
+            for idx, rk in enumerate(keys, 1):
+                try:
+                    plex.update_added_date(section_id, rk, "8", new_unix, lock=lock)
+                    ok += 1
+                except Exception as e:
+                    st.error(f"Failed id={rk}: {e}")
+                progress.progress(int(idx * 100 / max(1, len(keys))))
+                if per_item_sleep:
+                    time.sleep(per_item_sleep)
+            st.success(f"Updated {ok}/{len(keys)} artists.")
 
-    total_sel = sum(1 for v in selected.values() if v)
-    st.caption(f"Selected: {total_sel}")
+    # ── Date range selection ──
+    with st.expander("Select by Added date range", expanded=False):
+        presets = st.columns([1, 1, 1, 1, 1, 1, 1])
+        today = datetime.date.today()
+        preset_actions = {
+            "Last 7": (today - datetime.timedelta(days=7), today),
+            "Last 30": (today - datetime.timedelta(days=30), today),
+            "Last 90": (today - datetime.timedelta(days=90), today),
+            "Last 365": (today - datetime.timedelta(days=365), today),
+            "This Year": (datetime.date(today.year, 1, 1), today),
+        }
+        pkeys = list(preset_actions.keys())
+        for i, name in enumerate(pkeys):
+            with presets[i]:
+                if st.button(name, key=f"music_artist_preset_{name}"):
+                    s, e = preset_actions[name]
+                    st.session_state["music_artist_range_from"] = s
+                    st.session_state["music_artist_range_to"] = e
+        with presets[-2]:
+            if st.button("Older >1y", key="music_artist_preset_older"):
+                st.session_state["music_artist_range_from"] = today - datetime.timedelta(days=365 * 50)
+                st.session_state["music_artist_range_to"] = today - datetime.timedelta(days=365)
+        with presets[-1]:
+            if st.button("Clear", key="music_artist_preset_clear"):
+                st.session_state.pop("music_artist_range_from", None)
+                st.session_state.pop("music_artist_range_to", None)
 
+        rc1, rc2 = st.columns(2)
+        with rc1:
+            range_from = st.date_input("From", key="music_artist_range_from",
+                                       value=st.session_state.get("music_artist_range_from", today - datetime.timedelta(days=365)))
+        with rc2:
+            range_to = st.date_input("To", key="music_artist_range_to",
+                                     value=st.session_state.get("music_artist_range_to", today))
+
+        def _select_range_artists(select: bool):
+            start_ts = int(datetime.datetime.combine(range_from, datetime.time.min).timestamp())
+            end_ts = int(datetime.datetime.combine(range_to, datetime.time.max).timestamp())
+            progress = st.progress(0)
+            touched = 0
+            s = 0
+            while True:
+                batch_items, tot = plex.fetch_artists(section_id, start=s, size=page_size, sort=sort)
+                for it in batch_items:
+                    at = int(it.get("addedAt", 0) or 0)
+                    if start_ts <= at <= end_ts:
+                        rk = str(it.get("ratingKey"))
+                        if rk:
+                            selected[rk] = select
+                            touched += 1
+                s += page_size
+                if s >= tot:
+                    break
+                progress.progress(min(100, int(s * 100 / max(1, tot))))
+            progress.progress(100)
+            st.success(("Selected" if select else "Deselected") + f" {touched} artists in range.")
+
+        act1, act2 = st.columns(2)
+        with act1:
+            if st.button("Select range", key="music_artist_select_range"):
+                _select_range_artists(True)
+        with act2:
+            if st.button("Deselect range", key="music_artist_deselect_range"):
+                _select_range_artists(False)
+
+    st.divider()
+
+    # ═══ List ═══
     # ── Pagination ──
     col_prev, col_info, col_goto, col_next = st.columns([1, 2, 1, 1])
     with col_prev:
@@ -598,9 +664,11 @@ def _render_music_albums(plex: PlexAPI, section_id: str, artist_id: str, artist_
     total_pages = max(1, (total + page_size - 1) // page_size)
     selected: Dict[str, bool] = st.session_state.setdefault("music_album_selected", {})
 
-    # ── Batch controls ──
-    left, mid, right = st.columns([2, 3, 2])
-    with left:
+    # ═══ Modify dates ═══
+    st.markdown("#### Modify dates")
+
+    sel1, sel2, sel3 = st.columns([2, 3, 2])
+    with sel1:
         page_select_all = st.checkbox("Select all on page", key="music_album_sel_all_page")
         b1, b2 = st.columns(2)
         with b1:
@@ -625,33 +693,32 @@ def _render_music_albums(plex: PlexAPI, section_id: str, artist_id: str, artist_
             if st.button("Clear all", key="music_album_clear"):
                 selected.clear()
                 st.success("Cleared.")
-    with mid:
+    with sel2:
         batch_date = st.date_input("Batch date", value=datetime.date.today(), key="music_album_batch_date")
         max_per_min = st.number_input("Max/min (0=unlimited)", min_value=0, value=0, step=30, key="music_album_rate")
-    with right:
-        if st.button("Apply to selected", key="music_album_apply"):
+    with sel3:
+        total_sel = sum(1 for v in selected.values() if v)
+        st.caption(f"**{total_sel}** selected")
+        if st.button("Apply to selected", key="music_album_apply", disabled=total_sel == 0):
             keys = [k for k, v in selected.items() if v]
-            if not keys:
-                st.warning("No items selected.")
-            else:
-                new_unix = int(datetime.datetime.combine(batch_date, datetime.time.min).timestamp())
-                per_item_sleep = (60.0 / max_per_min) if max_per_min > 0 else 0.0
-                progress = st.progress(0)
-                ok = 0
-                for idx, rk in enumerate(keys, 1):
-                    try:
-                        plex.update_added_date(section_id, rk, "9", new_unix, lock=lock)
-                        ok += 1
-                    except Exception as e:
-                        st.error(f"Failed id={rk}: {e}")
-                    progress.progress(int(idx * 100 / max(1, len(keys))))
-                    if per_item_sleep:
-                        time.sleep(per_item_sleep)
-                st.success(f"Updated {ok}/{len(keys)} albums.")
+            new_unix = int(datetime.datetime.combine(batch_date, datetime.time.min).timestamp())
+            per_item_sleep = (60.0 / max_per_min) if max_per_min > 0 else 0.0
+            progress = st.progress(0)
+            ok = 0
+            for idx, rk in enumerate(keys, 1):
+                try:
+                    plex.update_added_date(section_id, rk, "9", new_unix, lock=lock)
+                    ok += 1
+                except Exception as e:
+                    st.error(f"Failed id={rk}: {e}")
+                progress.progress(int(idx * 100 / max(1, len(keys))))
+                if per_item_sleep:
+                    time.sleep(per_item_sleep)
+            st.success(f"Updated {ok}/{len(keys)} albums.")
 
-    total_sel = sum(1 for v in selected.values() if v)
-    st.caption(f"Selected: {total_sel}")
+    st.divider()
 
+    # ═══ List ═══
     # ── Pagination ──
     col_prev, col_info, col_goto, col_next = st.columns([1, 2, 1, 1])
     with col_prev:
@@ -749,9 +816,11 @@ def _render_music_tracks(plex: PlexAPI, section_id: str, album_id: str, album_na
     total_pages = max(1, (total + page_size - 1) // page_size)
     selected: Dict[str, bool] = st.session_state.setdefault("music_track_selected", {})
 
-    # ── Batch controls ──
-    left, mid, right = st.columns([2, 3, 2])
-    with left:
+    # ═══ Modify dates ═══
+    st.markdown("#### Modify dates")
+
+    sel1, sel2, sel3 = st.columns([2, 3, 2])
+    with sel1:
         page_select_all = st.checkbox("Select all on page", key="music_track_sel_all_page")
         b1, b2 = st.columns(2)
         with b1:
@@ -776,33 +845,32 @@ def _render_music_tracks(plex: PlexAPI, section_id: str, album_id: str, album_na
             if st.button("Clear all", key="music_track_clear"):
                 selected.clear()
                 st.success("Cleared.")
-    with mid:
+    with sel2:
         batch_date = st.date_input("Batch date", value=datetime.date.today(), key="music_track_batch_date")
         max_per_min = st.number_input("Max/min (0=unlimited)", min_value=0, value=0, step=30, key="music_track_rate")
-    with right:
-        if st.button("Apply to selected", key="music_track_apply"):
+    with sel3:
+        total_sel = sum(1 for v in selected.values() if v)
+        st.caption(f"**{total_sel}** selected")
+        if st.button("Apply to selected", key="music_track_apply", disabled=total_sel == 0):
             keys = [k for k, v in selected.items() if v]
-            if not keys:
-                st.warning("No items selected.")
-            else:
-                new_unix = int(datetime.datetime.combine(batch_date, datetime.time.min).timestamp())
-                per_item_sleep = (60.0 / max_per_min) if max_per_min > 0 else 0.0
-                progress = st.progress(0)
-                ok = 0
-                for idx, rk in enumerate(keys, 1):
-                    try:
-                        plex.update_added_date(section_id, rk, "10", new_unix, lock=lock)
-                        ok += 1
-                    except Exception as e:
-                        st.error(f"Failed id={rk}: {e}")
-                    progress.progress(int(idx * 100 / max(1, len(keys))))
-                    if per_item_sleep:
-                        time.sleep(per_item_sleep)
-                st.success(f"Updated {ok}/{len(keys)} tracks.")
+            new_unix = int(datetime.datetime.combine(batch_date, datetime.time.min).timestamp())
+            per_item_sleep = (60.0 / max_per_min) if max_per_min > 0 else 0.0
+            progress = st.progress(0)
+            ok = 0
+            for idx, rk in enumerate(keys, 1):
+                try:
+                    plex.update_added_date(section_id, rk, "10", new_unix, lock=lock)
+                    ok += 1
+                except Exception as e:
+                    st.error(f"Failed id={rk}: {e}")
+                progress.progress(int(idx * 100 / max(1, len(keys))))
+                if per_item_sleep:
+                    time.sleep(per_item_sleep)
+            st.success(f"Updated {ok}/{len(keys)} tracks.")
 
-    total_sel = sum(1 for v in selected.values() if v)
-    st.caption(f"Selected: {total_sel}")
+    st.divider()
 
+    # ═══ List ═══
     # ── Pagination ──
     col_prev, col_info, col_goto, col_next = st.columns([1, 2, 1, 1])
     with col_prev:
