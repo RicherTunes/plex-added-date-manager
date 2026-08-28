@@ -1015,48 +1015,23 @@ def main():
 
             # ── Sync dates from files ──
             with st.expander("🧠 Smart Sync — set addedAt from file dates (birthtime → mtime)", expanded=False):
-                st.caption("Fija el `addedAt` de cada **track** a la fecha de creación del archivo (birthtime, fallback mtime). Álbumes → fecha del track más reciente; Artistas → fecha del álbum más reciente. Siempre dry-run primero.")
-                if "sync_running" not in st.session_state:
-                    st.session_state["sync_running"] = False
+                st.caption("Sets each track's `addedAt` to the file creation date (birthtime, fallback to mtime). Albums → most recent track date; Artists → most recent album date. Always dry-run first.")
                 if "sync_plan" not in st.session_state:
                     st.session_state["sync_plan"] = None
-                if not st.session_state["sync_running"] and st.session_state["sync_plan"] is None:
+                if st.session_state["sync_plan"] is None:
                     if st.button("Preview changes (dry-run)", key="sync_preview"):
-                        st.session_state["sync_running"] = True
-                        st.session_state["sync_phase"] = "starting"
-                        st.session_state["sync_progress"] = (0, 1)
-                        _safe_rerun()
-                if st.session_state["sync_running"]:
-                    import threading
-                    progress = st.progress(0, text="Scanning files...")
-                    def _sync_bg():
-                        def _cb(phase, current, total):
-                            st.session_state["sync_phase"] = phase
-                            st.session_state["sync_progress"] = (current, total)
+                        progress = st.progress(0, text="Scanning files...")
                         try:
+                            def _cb(phase, current, total):
+                                pct = min(100, int(current * 100 / max(1, total)))
+                                progress.progress(pct, text=f"{phase}: {current}/{total}")
                             plan = plex.sync_dates_from_files(section_id, progress_callback=_cb)
+                            progress.progress(100, text="Done")
                             st.session_state["sync_plan"] = plan
                         except Exception as e:
-                            st.session_state["sync_error"] = str(e)
-                        finally:
-                            st.session_state["sync_running"] = False
-                    phase = st.session_state.get("sync_phase", "starting")
-                    current, total = st.session_state.get("sync_progress", (0, 1))
-                    pct = min(100, int(current * 100 / max(1, total)))
-                    progress.progress(pct, text=f"{phase}: {current}/{total}")
-                    if not st.session_state.get("sync_thread_started"):
-                        st.session_state["sync_thread_started"] = True
-                        t = threading.Thread(target=_sync_bg, daemon=True)
-                        t.start()
-                    else:
-                        _safe_rerun()
-                    sync_error = st.session_state.pop("sync_error", None)
-                    if sync_error:
-                        st.error(f"Sync failed: {sync_error}")
-                        st.session_state["sync_thread_started"] = False
+                            st.error(f"Sync failed: {e}")
                 plan = st.session_state.get("sync_plan")
                 if plan:
-                    st.session_state["sync_thread_started"] = False
                     stats = plan["stats"]
                     st.markdown(f"**{stats['tracks_updated']}** tracks to update, **{stats['albums_updated']}** albums, **{stats['artists_updated']}** artists")
                     st.caption(f"{stats['tracks_skipped']} tracks already correct, {stats['tracks_no_file']} tracks without file path")
