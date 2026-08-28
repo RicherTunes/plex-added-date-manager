@@ -2,9 +2,9 @@
 
 [![CI](https://github.com/RicherTunes/plex-added-date-manager/actions/workflows/ci.yml/badge.svg)](https://github.com/RicherTunes/plex-added-date-manager/actions/workflows/ci.yml)
 
-Streamlit (Python) app that interacts with the Plex API to fetch and manage movie data (Specifically Added Date).
+Streamlit (Python) app that interacts with the Plex API to fetch and manage added dates for Movies, TV Shows, and Music (Artists, Albums, Tracks).
 
-<img width="1231" alt="screen" src="https://github.com/user-attachments/assets/3fae4793-9799-48d8-9715-62fc80f95601" />
+<!-- Screenshot outdated — shows pre-Music UI. Update after next release. -->
 
 ## Setup Instructions
 
@@ -69,7 +69,7 @@ python src/cli.py --list-sections --sections-type show
 
 Flags:
 - `--section-id` (required): Your Plex library section id (Movies often `1`, Shows often `2`).
-- `--type`: `movie`/`1` or `show`/`2`.
+- `--type`: `movie`/`1`, `show`/`2`, `artist`/`8`, `album`/`9`, or `track`/`10`.
 - `--date` (required): New date in `YYYY-MM-DD`.
 - `--year`: Server-side filter.
 - `--title-contains`: Client-side filter per page.
@@ -88,11 +88,12 @@ CLI utilities:
 
 ### New Features
 
+- **Music support**: Browse Artists → Albums → Tracks with the same filter/sort/batch controls as Movies and TV.
 - Pagination: Control page size (50/100/200) and navigate pages. Avoids crashes on large libraries.
 - Server-side sorting and year filter: Sort by added date, title, or year; filter by year.
 - Title contains: Client-side filter on the current page to quickly narrow items.
 - Batch updates: Select multiple items (persist selections across pages), pick a date, and update all at once with progress feedback and optional metadata lock.
-- Section discovery: Section selector is auto-populated from your Plex server (Movies vs Shows).
+- Section discovery: Section selector is auto-populated from your Plex server (Movies vs Shows vs Music).
 - Select all results: With current filters applied, select items across all pages; also includes "Clear all".
 - QoL toggles: Show/hide images and enable/disable per-item edit controls to keep the UI light.
 
@@ -105,12 +106,7 @@ Notes:
 - Very large pages: Server-side pagination is implemented, but rendering hundreds of widgets with images on a single page can still feel heavy. Prefer page sizes of 50–200 and disable images when working through huge libraries.
 - No virtualization: Lists are not virtualized yet; we rely on pagination instead.
 - Network hiccups: Batch updates already retry with backoff, but a flaky connection may still surface transient errors in the UI log.
-
-## UI Density
-- Settings: Use the Settings link in the header to open the panel and toggle the pointer-aware default, or click Reset density only to return to Comfortable and clear the saved density.
-- Modes: Ultra Compact, Compact, Comfortable, Spacious.
-- Persistence: remembers your last density; new sessions default to Spacious on touch, Comfortable otherwise (configurable).
-- Reset All: restores defaults and clears nav query params.
+- Music: Year filter is not available for Artists (they don't have a year field). Album year filter is not server-side.
 
 ## License
 

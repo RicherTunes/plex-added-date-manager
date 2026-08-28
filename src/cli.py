@@ -34,9 +34,9 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     )
     p.add_argument(
         "--type",
-        choices=["movie", "show", "1", "2"],
+        choices=["movie", "show", "artist", "album", "track", "1", "2", "8", "9", "10"],
         default="movie",
-        help="Item type: movie (1) or show (2)",
+        help="Item type: movie (1), show (2), artist (8), album (9), or track (10)",
     )
     p.add_argument("--date", help="New date in YYYY-MM-DD format")
     p.add_argument("--year", help="Filter by year (server-side)")
@@ -145,7 +145,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             print(f"{s['key']}\t{s.get('type','')}\t{s.get('title','')}")
         return 0
 
-    type_id = "1" if args.type in {"movie", "1"} else "2"
+    type_id_map = {"movie": "1", "show": "2", "artist": "8", "album": "9", "track": "10"}
+    type_id = type_id_map.get(args.type, args.type)
     if not args.section_id or not args.date:
         print(
             "--section-id and --date are required for updates (omit them only with --list-sections)",

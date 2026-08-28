@@ -82,16 +82,7 @@ class PlexAPI:
             total = container.get("size", len(items))
         return items, int(total)
 
-    # Backwards compatibility helpers
-    def get_all_movies(self):
-        # default first page only to avoid massive payloads
-        items, _total = self.fetch_items("1", "1", start=0, size=100)
-        return items
-
-    def fetch_seasons(self, section_id: str):
-        # In Plex, type=2 is "show" (series). Keep prior behavior.
-        items, _total = self.fetch_items(section_id, "2", start=0, size=100)
-        return items
+    # (removed unused legacy helpers get_all_movies/fetch_seasons)
 
     # --- Update ---
     def update_added_date(
@@ -116,6 +107,72 @@ class PlexAPI:
         )
         response.raise_for_status()
         return True
+
+    # --- Music ---
+    def fetch_artists(
+        self,
+        section_id: str,
+        *,
+        start: int = 0,
+        size: int = 100,
+        sort: str = "addedAt:desc",
+    ) -> Tuple[List[dict], int]:
+        """Fetch artists (type=8) from a music library section."""
+        return self.fetch_items(section_id, "8", start=start, size=size, sort=sort)
+
+    def fetch_albums_for_artist(
+        self,
+        section_id: str,
+        artist_id: str,
+        *,
+        start: int = 0,
+        size: int = 100,
+        sort: str = "addedAt:desc",
+    ) -> Tuple[List[dict], int]:
+        """Fetch albums (type=9) for a specific artist."""
+        url = f"{self.base_url}/library/sections/{section_id}/all"
+        params: Dict[str, str] = {
+            "type": "9",
+            "artist.id": artist_id,
+            "sort": sort,
+            "X-Plex-Container-Start": str(start),
+            "X-Plex-Container-Size": str(size),
+        }
+        response = self.session.get(url, headers=self._get_headers(), params=params, timeout=30)
+        response.raise_for_status()
+        container = response.json().get("MediaContainer", {})
+        items = container.get("Metadata", []) or []
+        total = container.get("totalSize")
+        if total is None:
+            total = container.get("size", len(items))
+        return items, int(total)
+
+    def fetch_tracks_for_album(
+        self,
+        section_id: str,
+        album_id: str,
+        *,
+        start: int = 0,
+        size: int = 100,
+        sort: str = "addedAt:desc",
+    ) -> Tuple[List[dict], int]:
+        """Fetch tracks (type=10) for a specific album."""
+        url = f"{self.base_url}/library/sections/{section_id}/all"
+        params: Dict[str, str] = {
+            "type": "10",
+            "album.id": album_id,
+            "sort": sort,
+            "X-Plex-Container-Start": str(start),
+            "X-Plex-Container-Size": str(size),
+        }
+        response = self.session.get(url, headers=self._get_headers(), params=params, timeout=30)
+        response.raise_for_status()
+        container = response.json().get("MediaContainer", {})
+        items = container.get("Metadata", []) or []
+        total = container.get("totalSize")
+        if total is None:
+            total = container.get("size", len(items))
+        return items, int(total)
 
     # --- Utilities ---
     def thumb_url(self, path: Optional[str]) -> Optional[str]:
