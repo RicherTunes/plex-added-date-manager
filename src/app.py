@@ -17,6 +17,12 @@ st.markdown(
     .title-row h3 { margin-bottom:2px; }
     .chip { display:inline-block; background:#eef2ff; color:#3730a3; padding:2px 8px;
             border-radius:12px; font-size:0.75rem; margin-right:6px; }
+    .pam-zone-header { font-size:0.80rem; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; margin: 2px 0 6px 2px; }
+    .pam-zone-header.filters { color:#1d4ed8; }
+    .pam-zone-header.display { color:#6d28d9; }
+    .pam-zone-header.toolbar { color:#92400e; }
+    .pam-zone-header.actions { color:#991b1b; }
+    html { scroll-behavior: smooth; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -41,6 +47,7 @@ def _controls(prefix: str, *, sections: List[dict], required_type: str) -> Dict:
     labels = [f"{s['title']} (#{s['key']})" for s in typed]
     label_to_key = {f"{s['title']} (#{s['key']})": s["key"] for s in typed}
 
+    st.markdown('<div class="pam-zone-header filters">🔍 Filters</div>', unsafe_allow_html=True)
     r1c1, r1c2, r1c3, r1c4, r1c5, r1c6 = st.columns([2.4, 1, 1.2, 1, 1.4, 1])
     with r1c1:
         if labels:
@@ -68,6 +75,7 @@ def _controls(prefix: str, *, sections: List[dict], required_type: str) -> Dict:
     with r1c6:
         st.checkbox("Show images", key=f"{prefix}_show_images", value=True)
 
+    st.markdown('<div class="pam-zone-header display">⚙️ Display Options</div>', unsafe_allow_html=True)
     r2c1, r2c2, r2c3, r2c4 = st.columns([1, 1, 3, 1.2])
     with r2c1:
         st.checkbox("Lock added date", key=f"{prefix}_lock", value=True)
@@ -118,8 +126,9 @@ def _render_items(
     title_filter = (st.session_state.get(f"{prefix}_title_filter", "") or "").strip().lower()
     selected: Dict[str, bool] = st.session_state.setdefault(f"{prefix}_selected", {})
 
-    # ═══ Modify dates ═══
-    st.markdown("#### Modify dates")
+    # ═══ Actions ═══
+    st.markdown('<div id="actions-panel"></div>', unsafe_allow_html=True)
+    st.markdown('<div class="pam-zone-header actions">⚡ Actions — Modify dates</div>', unsafe_allow_html=True)
 
     sel1, sel2, sel3 = st.columns([2, 3, 2])
     with sel1:
@@ -265,7 +274,9 @@ def _render_items(
 
     st.divider()
 
-    # ═══ List ═══
+    # ═══ Results toolbar ═══
+    st.markdown('<div class="pam-zone-header toolbar">📋 Results Toolbar</div>', unsafe_allow_html=True)
+    st.markdown('<a href="#actions-panel" style="font-size:0.85rem">Jump to Actions ▸</a>', unsafe_allow_html=True)
     # ── Pagination ──
     col_prev, col_info, col_goto, col_next = st.columns([1, 2, 1, 1])
     with col_prev:
@@ -386,7 +397,7 @@ def _render_items(
 
 def _music_controls(prefix: str) -> Dict:
     """Render filter/sort controls for music views — same layout as Movies/TV."""
-
+    st.markdown('<div class="pam-zone-header filters">🔍 Filters</div>', unsafe_allow_html=True)
     r1c1, r1c2, r1c3, r1c4, r1c5 = st.columns([2.4, 1, 1.2, 1.4, 1])
     with r1c1:
         st.text_input("Title contains", key=f"{prefix}_title_filter")
@@ -403,6 +414,7 @@ def _music_controls(prefix: str) -> Dict:
     with r1c5:
         st.checkbox("Show images", key=f"{prefix}_show_images", value=True)
 
+    st.markdown('<div class="pam-zone-header display">⚙️ Display Options</div>', unsafe_allow_html=True)
     r2c1, r2c2, r2c3 = st.columns([1, 1, 4])
     with r2c1:
         if st.button("Reset Filters", key=f"{prefix}_reset"):
@@ -449,7 +461,8 @@ def _render_music_artists(plex: PlexAPI, section_id: str):
     selected: Dict[str, bool] = st.session_state.setdefault("music_artist_selected", {})
 
     # ═══ Modify dates ═══
-    st.markdown("#### Modify dates")
+    st.markdown('<div id="actions-panel-music"></div>', unsafe_allow_html=True)
+    st.markdown('<div class="pam-zone-header actions">⚡ Actions — Modify dates</div>', unsafe_allow_html=True)
 
     sel1, sel2, sel3 = st.columns([2, 3, 2])
     with sel1:
@@ -666,7 +679,8 @@ def _render_music_albums(plex: PlexAPI, section_id: str, artist_id: str, artist_
     selected: Dict[str, bool] = st.session_state.setdefault("music_album_selected", {})
 
     # ═══ Modify dates ═══
-    st.markdown("#### Modify dates")
+    st.markdown('<div id="actions-panel-music"></div>', unsafe_allow_html=True)
+    st.markdown('<div class="pam-zone-header actions">⚡ Actions — Modify dates</div>', unsafe_allow_html=True)
 
     sel1, sel2, sel3 = st.columns([2, 3, 2])
     with sel1:
@@ -818,7 +832,8 @@ def _render_music_tracks(plex: PlexAPI, section_id: str, album_id: str, album_na
     selected: Dict[str, bool] = st.session_state.setdefault("music_track_selected", {})
 
     # ═══ Modify dates ═══
-    st.markdown("#### Modify dates")
+    st.markdown('<div id="actions-panel-music"></div>', unsafe_allow_html=True)
+    st.markdown('<div class="pam-zone-header actions">⚡ Actions — Modify dates</div>', unsafe_allow_html=True)
 
     sel1, sel2, sel3 = st.columns([2, 3, 2])
     with sel1:
