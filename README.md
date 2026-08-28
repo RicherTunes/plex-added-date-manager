@@ -2,43 +2,66 @@
 
 [![CI](https://github.com/RicherTunes/plex-added-date-manager/actions/workflows/ci.yml/badge.svg)](https://github.com/RicherTunes/plex-added-date-manager/actions/workflows/ci.yml)
 
-Streamlit (Python) app that interacts with the Plex API to fetch and manage added dates for Movies, TV Shows, and Music (Artists, Albums, Tracks).
+Streamlit (Python) app that interacts with the Plex API to manage added dates for Movies, TV Shows, and Music (Artists, Albums, Tracks).
 
-<!-- Screenshot outdated — shows pre-Music UI. Update after next release. -->
-
-## Setup Instructions
+## Setup
 
 1. **Clone the repository**
-2. **Create a virtual environment (optional but recommended):**
+2. **Create a virtual environment:**
    ```bash
    python -m venv venv
-   source venv/bin/activate  # On Windows use `venv\Scripts\activate`
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
-3. **Install the required dependencies:**
+3. **Install dependencies:**
    ```bash
    pip install -r requirements.txt
    ```
-4. **Configure your Plex credentials:** Create a `.env` file at project root
+4. **Configure Plex credentials:** Create a `.env` file at project root
    ```ini
-     PLEX_TOKEN=your_plex_token_here
-     PLEX_BASE_URL=http://your-plex-ip:32400
+   PLEX_TOKEN=your_plex_token_here
+   PLEX_BASE_URL=http://your-plex-ip:32400
    ```
 
 ## Usage
 
-1. **Run the Streamlit application:**
-   ```bash
-   streamlit run src/app.py
-   ```
+```bash
+streamlit run src/app.py
+```
 
-2. **Access the application:**
-   Open your web browser and go to `http://localhost:8501`.
+Open `http://localhost:8501` in your browser.
 
-### CLI Batch Mode
+### What you can do
+
+- **Movies & TV Shows**: Browse your libraries, filter by year/title, sort by added date or title, edit dates individually or in batch.
+- **Music**: Browse Artists → Albums → Tracks with the same controls. Navigate with breadcrumbs (`← Artist Name` to go back).
+- **Batch updates**: Select multiple items (across pages), pick a date, and update all at once with progress feedback.
+- **Date range selection** (Movies/TV): Filter by preset ranges (Last 7/30/90/365 days, This Year, Older >1y) or set a custom date range.
+- **Per-item auto-save**: Change a date and it saves immediately — no need to click a save button.
+
+### UI controls
+
+| Control | What it does |
+|---------|-------------|
+| **Page Size** | 50, 100, or 200 items per page |
+| **Sort** | By added date or title (ascending/descending) |
+| **Title contains** | Filter items by name (client-side) |
+| **Year** | Filter by year (server-side, Movies/TV only) |
+| **Lock added date** | Prevent Plex from overwriting the date on next scan |
+| **Show images** | Toggle thumbnail visibility |
+| **Show details** | Show resolution, file size, duration, genres, etc. |
+| **Reset Filters** | Clear all filters and return to defaults |
+| **Go to page** | Jump directly to any page |
+
+### Batch operations
+
+1. Check individual items or use **Select all on page** / **Select all results**
+2. Pick a date in the **Batch date** picker
+3. Optionally set a rate limit (**Max/min**) to avoid overwhelming Plex
+4. Click **Apply to selected**
+
+## CLI Batch Mode
 
 Run without the UI to update many items efficiently.
-
-Examples:
 
 ```bash
 # Dry run: update all movies (section 1) from 2023 to have addedAt 2024-01-15
@@ -47,69 +70,55 @@ python src/cli.py --section-id 1 --type movie --year 2023 --date 2024-01-15 --dr
 # Apply with lock and throttle 0.1s per item
 python src/cli.py --section-id 1 --type movie --year 2023 --date 2024-01-15 --sleep 0.1
 
-# Rate limit to at most 120 updates/minute (auto sleep)
+# Rate limit to at most 120 updates/minute
 python src/cli.py --section-id 1 --type movie --year 2023 --date 2024-01-15 --max-per-minute 120
 
-# Only items whose title contains "Batman" (client-side filter)
+# Filter by title
 python src/cli.py --section-id 1 --type movie --title-contains batman --date 2022-10-01
 
-# Explicit ids (skips fetch)
+# Update specific items by ID
 python src/cli.py --section-id 1 --type movie --ids 12345 67890 --date 2021-06-01
 
-# Override env variables if needed
-python src/cli.py --section-id 1 --type movie --date 2024-01-15 \
-  --base-url http://your-plex-ip:32400 --token YOUR_PLEX_TOKEN
+# Music: update all tracks in an album
+python src/cli.py --section-id 11 --type track --date 2024-01-15
 
-# List sections
+# List all library sections
 python src/cli.py --list-sections
 
-# List only TV sections
-python src/cli.py --list-sections --sections-type show
+# List only music sections
+python src/cli.py --list-sections --sections-type artist
 ```
 
-Flags:
-- `--section-id` (required): Your Plex library section id (Movies often `1`, Shows often `2`).
-- `--type`: `movie`/`1`, `show`/`2`, `artist`/`8`, `album`/`9`, or `track`/`10`.
-- `--date` (required): New date in `YYYY-MM-DD`.
-- `--year`: Server-side filter.
-- `--title-contains`: Client-side filter per page.
-- `--ids`: Update only these ratingKeys.
-- `--page-size`: Fetch page size (default 200).
-- `--max-items`: Stop after N updates.
-- `--sleep`: Seconds between updates.
-- `--max-per-minute`: Ceiling on updates per minute; auto-calculates sleep.
-- `--no-lock`: Do not lock the `addedAt` field after update.
-- `--dry-run`: Show planned changes only.
-- `--base-url`, `--token`: Override `.env`.
- 
-CLI utilities:
-- `--list-sections`: Prints `key`, `type`, and `title` for all libraries.
-- `--sections-type`: Filter list by type (e.g., `show`, `movie`).
+### CLI flags
 
-### New Features
+| Flag | Description |
+|------|-------------|
+| `--section-id` | Plex library section ID (required). Movies often `1`, Shows `2`, Music `11`. |
+| `--type` | `movie`/`1`, `show`/`2`, `artist`/`8`, `album`/`9`, `track`/`10` |
+| `--date` | New date in `YYYY-MM-DD` format (required) |
+| `--year` | Filter by year (server-side) |
+| `--title-contains` | Filter by title (client-side) |
+| `--ids` | Update only these ratingKeys |
+| `--page-size` | Fetch page size (default 200) |
+| `--max-items` | Stop after N updates |
+| `--sleep` | Seconds between updates |
+| `--max-per-minute` | Rate limit; auto-calculates sleep |
+| `--no-lock` | Do not lock `addedAt` after update |
+| `--dry-run` | Show planned changes only |
+| `--base-url` | Override `PLEX_BASE_URL` |
+| `--token` | Override `PLEX_TOKEN` |
+| `--list-sections` | Print key, type, and title for all libraries |
+| `--sections-type` | Filter list by type: `movie`, `show`, `artist`, `photo`, `mixed` |
 
-- **Music support**: Browse Artists → Albums → Tracks with the same filter/sort/batch controls as Movies and TV.
-- Pagination: Control page size (50/100/200) and navigate pages. Avoids crashes on large libraries.
-- Server-side sorting and year filter: Sort by added date, title, or year; filter by year.
-- Title contains: Client-side filter on the current page to quickly narrow items.
-- Batch updates: Select multiple items (persist selections across pages), pick a date, and update all at once with progress feedback and optional metadata lock.
-- Section discovery: Section selector is auto-populated from your Plex server (Movies vs Shows vs Music).
-- Select all results: With current filters applied, select items across all pages; also includes "Clear all".
-- QoL toggles: Show/hide images and enable/disable per-item edit controls to keep the UI light.
-
-Notes:
-- Movies use section id default `1`, shows use default `2`. Adjust in the UI if yours differ.
-- Batch updates send one request per item. For very large batches, consider running in smaller chunks.
+The CLI retries failed updates up to 3 times with exponential backoff.
 
 ## Known Limitations
 
-- Very large pages: Server-side pagination is implemented, but rendering hundreds of widgets with images on a single page can still feel heavy. Prefer page sizes of 50–200 and disable images when working through huge libraries.
-- No virtualization: Lists are not virtualized yet; we rely on pagination instead.
-- Network hiccups: Batch updates already retry with backoff, but a flaky connection may still surface transient errors in the UI log.
-- Music: Year filter is not available for Artists (they don't have a year field). Album year filter is not server-side.
+- Rendering hundreds of widgets with images on a single page can feel heavy. Use page sizes of 50–200 and disable images for large libraries.
+- Lists are not virtualized; pagination is the workaround.
+- Music: Year filter is not available for Artists (no year field). Album year is displayed but not filterable server-side.
+- Batch updates send one request per item. For very large batches, consider smaller chunks or CLI mode.
 
 ## License
 
-This project is licensed under the MIT License. See the LICENSE file for more details.
-
-
+MIT
