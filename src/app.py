@@ -118,9 +118,11 @@ def _render_items(
     title_filter = (st.session_state.get(f"{prefix}_title_filter", "") or "").strip().lower()
     selected: Dict[str, bool] = st.session_state.setdefault(f"{prefix}_selected", {})
 
-    # ── Batch controls ──
-    left, mid, right = st.columns([2, 3, 2])
-    with left:
+    # ═══ Modify dates ═══
+    st.markdown("#### Modify dates")
+
+    sel1, sel2, sel3 = st.columns([2, 3, 2])
+    with sel1:
         page_select_all = st.checkbox("Select all on page", key=f"{prefix}_sel_all_page")
         b1, b2, b3 = st.columns(3)
         with b1:
@@ -158,42 +160,38 @@ def _render_items(
                         selected[rk] = False
                 st.success("Cleared page.")
 
-    with mid:
+    with sel2:
         batch_date = st.date_input("Batch date", value=datetime.date.today(), key=f"{prefix}_batch_date")
         max_per_min = st.number_input("Max/min (0=unlimited)", min_value=0, value=0, step=30, key=f"{prefix}_rate")
 
-    with right:
-        if st.button("Apply to selected", key=f"{prefix}_apply"):
+    with sel3:
+        total_sel = sum(1 for v in selected.values() if v)
+        st.caption(f"**{total_sel}** selected")
+        if st.button("Apply to selected", key=f"{prefix}_apply", disabled=total_sel == 0):
             keys = [k for k, v in selected.items() if v]
-            if not keys:
-                st.warning("No items selected.")
-            else:
-                new_unix = int(datetime.datetime.combine(batch_date, datetime.time.min).timestamp())
-                per_item_sleep = (60.0 / max_per_min) if max_per_min > 0 else 0.0
-                progress = st.progress(0)
-                ok = 0
-                for idx, rk in enumerate(keys, 1):
-                    last_err = None
-                    attempts = 0
-                    while attempts < 4:
-                        try:
-                            plex.update_added_date(section_id, rk, type_id, new_unix, lock=lock_added)
-                            ok += 1
-                            last_err = None
-                            break
-                        except Exception as e:
-                            attempts += 1
-                            last_err = e
-                            time.sleep(min(8, 0.5 * (2 ** (attempts - 1))))
-                    if last_err is not None:
-                        st.error(f"Failed id={rk}: {last_err}")
-                    progress.progress(int(idx * 100 / max(1, len(keys))))
-                    if per_item_sleep:
-                        time.sleep(per_item_sleep)
-                st.success(f"Updated {ok}/{len(keys)} items.")
-
-    total_sel = sum(1 for v in selected.values() if v)
-    st.caption(f"Selected: {total_sel}")
+            new_unix = int(datetime.datetime.combine(batch_date, datetime.time.min).timestamp())
+            per_item_sleep = (60.0 / max_per_min) if max_per_min > 0 else 0.0
+            progress = st.progress(0)
+            ok = 0
+            for idx, rk in enumerate(keys, 1):
+                last_err = None
+                attempts = 0
+                while attempts < 4:
+                    try:
+                        plex.update_added_date(section_id, rk, type_id, new_unix, lock=lock_added)
+                        ok += 1
+                        last_err = None
+                        break
+                    except Exception as e:
+                        attempts += 1
+                        last_err = e
+                        time.sleep(min(8, 0.5 * (2 ** (attempts - 1))))
+                if last_err is not None:
+                    st.error(f"Failed id={rk}: {last_err}")
+                progress.progress(int(idx * 100 / max(1, len(keys))))
+                if per_item_sleep:
+                    time.sleep(per_item_sleep)
+            st.success(f"Updated {ok}/{len(keys)} items.")
 
     # ── Date range selection ──
     with st.expander("Select by Added date range", expanded=False):
@@ -265,6 +263,9 @@ def _render_items(
             if st.button("Deselect range", key=f"{prefix}_deselect_range"):
                 _select_range(False)
 
+    st.divider()
+
+    # ═══ List ═══
     # ── Pagination ──
     col_prev, col_info, col_goto, col_next = st.columns([1, 2, 1, 1])
     with col_prev:
